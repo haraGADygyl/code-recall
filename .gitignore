@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Logs
+debug.log
+recall_error.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Lock files
+uv.lock
+

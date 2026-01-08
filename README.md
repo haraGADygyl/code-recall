@@ -1,0 +1,86 @@
+# 🧠 CodeRecall
+
+CodeRecall is a lightweight, terminal-based flashcard app that uses local LLMs to help you retain knowledge from your markdown articles. No databases, no cloud, just you and your notes.
+
+![Startup](screenshots/00.png)
+*Main interface with a question.*
+
+![Interface](screenshots/01.png)
+*Main interface with question, answer and feedback.*
+
+## 🚀 Features
+
+- **TUI Power**: A sleek terminal interface built with [Textual](https://textual.textualize.io/).
+- **Local Intelligence**: Uses [Ollama](https://ollama.ai/) with `gemma2:2b` to generate questions and evaluate your answers.
+- **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
+- **Deep Recall**: Not just multiple choice—type your answers and get strict technical feedback.
+- **VRAM Optimized**: Explicitly unloads models on exit to keep your GPU ready for other tasks.
+
+## 🛠 Setup
+
+### 1. Prerequisites
+- **Python 3.12+**
+- **[uv](https://github.com/astral-sh/uv)** (Python package manager)
+- **[Ollama](https://ollama.ai/)** (Installed and available in PATH)
+
+### 2. Installation
+Clone this repository and sync dependencies:
+
+```bash
+uv sync
+```
+
+### 3. Configuration
+Copy the example environment file and customize it if needed:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and adjust the variables:
+- `ARTICLES_DIR`: The path to your markdown files (defaults to `./articles`).
+- `MODEL_NAME`: The Ollama model to use (defaults to `gemma2:2b`).
+
+### 4. Prepare Articles
+Place your `.md` articles in the directory specified by `ARTICLES_DIR` in your `.env` file.
+
+## 🎮 Usage
+
+Run the app directly with `uv`:
+
+```bash
+uv run main.py
+```
+
+### Keyboard Shortcuts
+| Key | Action |
+|-----|--------|
+| `Ctrl+S` | Submit Answer |
+| `Ctrl+N` | Next Question |
+| `Ctrl+Q` | Quit Application |
+
+## ⚙️ How it Works
+
+1. **Generation**: The app picks a random markdown file and asks Ollama to generate a conceptual question.
+2. **Interaction**: You type your answer in the provided text area.
+3. **Evaluation**: Ollama acts as a "Strict Technical Interviewer," grading your response as **PASS** or **FAIL** with feedback on missing concepts.
+
+## 📝 Automation (Cron)
+
+To run CodeRecall every 2 hours and have it pop up a terminal window:
+
+1.  Make sure `recall.sh` has the correct paths.
+2.  Open your crontab:
+    ```bash
+    crontab -e
+    ```
+3.  Add the following line (update the path to the script):
+    ```bash
+    0 */2 * * * /home/manushev/GitHub/python/code-recall/recall.sh
+    ```
+
+> [!NOTE]
+> The `recall.sh` script sets `DISPLAY`, `XAUTHORITY`, and `DBUS_SESSION_BUS_ADDRESS`. You may need to update these in the script to match your local session (e.g., `echo $DISPLAY`). The script will automatically try to read the model name from your `.env` file to handle VRAM cleanup.
+
+---
+Created by [Tihomir Manushev](https://github.com/haraGADygyl).
