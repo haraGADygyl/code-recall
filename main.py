@@ -5,6 +5,7 @@ import subprocess
 import time
 
 import ollama
+from openai import OpenAI
 from pydantic import BaseModel, Field
 from rich.markdown import Markdown
 from settings import settings
@@ -50,12 +51,32 @@ class StartupScreen(Screen):
 
     def on_mount(self) -> None:
         self.query_one("#status-label", Label).update(self.status_message)
-        self.check_ollama()
+        self.run_startup_checks()
 
     @work(thread=True)
-    def check_ollama(self) -> None:
+    def run_startup_checks(self) -> None:
+        """Run startup checks based on the default provider."""
+        # Only check Ollama if it's the default provider
+        if settings.DEFAULT_PROVIDER == "ollama":
+            if not self.check_ollama():
+                return
+
+        # Check Articles (always required)
+        logging.info("Startup: Checking articles...")
+        self.update_status("Checking articles...")
+        if not settings.ARTICLES_DIR.exists() or not list(settings.ARTICLES_DIR.glob("*.md")):
+            logging.error("Startup: No articles found.")
+            self.fail_startup(f"No .md files found in {settings.ARTICLES_DIR.absolute()}")
+            return
+
+        logging.info("Startup: Complete.")
+        self.update_status("Ready!")
+        time.sleep(1)
+        self.app.call_from_thread(self.finish_startup)
+
+    def check_ollama(self) -> bool:
+        """Check Ollama service and model. Returns True if successful."""
         logging.info("Startup: Checking Ollama service...")
-        # 1. Check if Ollama is running
         self.update_status("Checking Ollama service...")
         try:
             ollama.list()
@@ -64,14 +85,12 @@ class StartupScreen(Screen):
             logging.warning(f"Startup: Ollama not running ({e}). Attempting to start...")
             self.update_status("Ollama not running. Attempting to start...")
             try:
-                # Attempt to start ollama serve in background
                 subprocess.Popen(
                     ["ollama", "serve"],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
                 logging.info("Startup: Launched ollama serve.")
-                # Wait for it to come up
                 for i in range(10):
                     time.sleep(1)
                     try:
@@ -83,21 +102,19 @@ class StartupScreen(Screen):
                 else:
                     logging.error("Startup: Timeout starting Ollama.")
                     self.fail_startup("Could not start Ollama. Please run 'ollama serve' manually.")
-                    return
+                    return False
             except FileNotFoundError:
                 logging.error("Startup: Ollama binary not found.")
                 self.fail_startup("Ollama executable not found. Please install Ollama.")
-                return
+                return False
 
-        # 2. Check for Model
+        # Check for Model
         logging.info(f"Startup: Checking for model {settings.MODEL_NAME}...")
         self.update_status(f"Checking for model {settings.MODEL_NAME}...")
         try:
             models = ollama.list()
-            # ollama.list() returns a list of objects usually, checking names
             model_names = [m["model"] for m in models.get("models", [])]
             logging.info(f"Startup: Found models: {model_names}")
-            # Simple check if model name is contained (handling :latest etc)
             if not any(settings.MODEL_NAME in name for name in model_names):
                 logging.info(f"Startup: {settings.MODEL_NAME} not found. Pulling...")
                 self.update_status(f"Model {settings.MODEL_NAME} not found. Pulling (this may take a while)...")
@@ -106,21 +123,9 @@ class StartupScreen(Screen):
         except Exception as e:
             logging.error(f"Startup: Model check failed: {e}")
             self.fail_startup(f"Error checking/pulling model: {e}")
-            return
+            return False
 
-        # 3. Check Articles
-        logging.info("Startup: Checking articles...")
-        self.update_status("Checking articles...")
-        if not settings.ARTICLES_DIR.exists() or not list(settings.ARTICLES_DIR.glob("*.md")):
-            logging.error("Startup: No articles found.")
-            self.fail_startup(f"No .md files found in {settings.ARTICLES_DIR.absolute()}")
-            return
-
-        logging.info("Startup: Complete.")
-        self.update_status("Ready!")
-        time.sleep(1)
-        # Use call_from_thread to safely interact with the main thread
-        self.app.call_from_thread(self.finish_startup)
+        return True
 
     def finish_startup(self) -> None:
         logging.info("Startup: Finishing startup sequence...")
@@ -194,9 +199,7 @@ class CodeRecallApp(App):
 
     #source-label {
         width: 100%;
-        text-align: right;
         color: #666;
-        padding-right: 2;
         margin-bottom: 1;
     }
 
@@ -247,11 +250,14 @@ class CodeRecallApp(App):
         ("ctrl+q", "quit", "Quit"),
         ("ctrl+s", "submit_answer", "Submit"),
         ("ctrl+n", "next_question", "Next"),
+        ("ctrl+t", "toggle_provider", "Toggle Provider"),
     ]
 
     current_article_text: str = ""
     current_article_title: str = ""
     current_question: str = ""
+    current_provider: reactive[str] = reactive(settings.DEFAULT_PROVIDER)
+    ollama_verified: bool = False
 
     class StartupComplete(Message):
         pass
@@ -279,7 +285,106 @@ class CodeRecallApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Set initial provider from settings and mark Ollama as verified if it was default
+        self.current_provider = settings.DEFAULT_PROVIDER
+        if settings.DEFAULT_PROVIDER == "ollama":
+            self.ollama_verified = True
         self.push_screen(StartupScreen())
+
+    def watch_current_provider(self, provider: str) -> None:
+        """Update UI when provider changes."""
+        self.update_provider_display()
+
+    def update_provider_display(self) -> None:
+        """Update the provider status in the source label."""
+        provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
+        model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
+        try:
+            source_label = self.query_one("#source-label", Label)
+            source_label.update(
+                f"Source: {self.current_article_title}  |  Provider: {provider_name}  |  Model: {model_name}"
+            )
+        except Exception as e:
+            logging.error(f"Failed to update provider display: {e}")
+
+    def action_toggle_provider(self) -> None:
+        """Toggle between OpenAI and Ollama providers."""
+        if self.current_provider == "openai":
+            # Switching to Ollama - need to verify it's available
+            if not self.ollama_verified:
+                self.notify("Checking Ollama availability...", severity="information")
+                self.verify_and_switch_to_ollama()
+            else:
+                self.current_provider = "ollama"
+                self.update_provider_display()
+                self.notify("Switched to Ollama", severity="information")
+        else:
+            self.current_provider = "openai"
+            self.update_provider_display()
+            self.notify("Switched to OpenAI", severity="information")
+
+    @work(thread=True)
+    def verify_and_switch_to_ollama(self) -> None:
+        """Verify Ollama is available before switching."""
+        try:
+            ollama.list()
+            # Check if model exists
+            models = ollama.list()
+            model_names = [m["model"] for m in models.get("models", [])]
+            if not any(settings.MODEL_NAME in name for name in model_names):
+                self.call_from_thread(
+                    lambda: self.notify(f"Model {settings.MODEL_NAME} not found. Please pull it first.", severity="error")
+                )
+                return
+            self.ollama_verified = True
+            self.current_provider = "ollama"
+            self.call_from_thread(self._on_ollama_switch_complete)
+        except Exception as e:
+            logging.error(f"Ollama verification failed: {e}")
+            self.call_from_thread(
+                lambda: self.notify("Ollama not available. Please start Ollama service.", severity="error")
+            )
+
+    def _on_ollama_switch_complete(self) -> None:
+        """Called from main thread after successful Ollama switch."""
+        self.update_provider_display()
+        self.notify("Switched to Ollama", severity="information")
+
+    def llm_chat(
+        self, messages: list[dict[str, str]], response_format: dict | None = None
+    ) -> str:
+        """Route chat request to the current provider."""
+        if self.current_provider == "openai":
+            return self._openai_chat(messages, response_format)
+        else:
+            return self._ollama_chat(messages, response_format)
+
+    def _openai_chat(
+        self, messages: list[dict[str, str]], response_format: dict | None = None
+    ) -> str:
+        """Send chat request to OpenAI."""
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        kwargs: dict = {
+            "model": settings.OPENAI_MODEL_NAME,
+            "messages": messages,
+        }
+        if response_format:
+            kwargs["response_format"] = {"type": "json_object"}
+        response = client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content or ""
+
+    def _ollama_chat(
+        self, messages: list[dict[str, str]], response_format: dict | None = None
+    ) -> str:
+        """Send chat request to Ollama."""
+        kwargs: dict = {
+            "model": settings.MODEL_NAME,
+            "messages": messages,
+        }
+        if response_format:
+            kwargs["format"] = response_format
+        response = ollama.chat(**kwargs)
+        return response["message"]["content"]
 
     def on_startup_complete(self, message: StartupComplete) -> None:
         self.pop_screen()
@@ -318,10 +423,11 @@ class CodeRecallApp(App):
         )
 
         try:
-            response = ollama.chat(
-                model=settings.MODEL_NAME, messages=[{"role": "user", "content": user_prompt}], format="json"
+            response_text = self.llm_chat(
+                messages=[{"role": "user", "content": user_prompt}],
+                response_format="json",
             )
-            data = json.loads(response["message"]["content"])
+            data = json.loads(response_text)
             self.current_question = data.get("question", "Failed to parse question.")
 
             # Update UI
@@ -335,7 +441,11 @@ class CodeRecallApp(App):
         self.query_one("#main-status", Label).add_class("hidden")
         q_box = self.query_one("#question-box", Static)
         q_box.update(Markdown(f"**Question:**\n{self.current_question}"))
-        self.query_one("#source-label", Label).update(f"Source: {self.current_article_title}")
+        provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
+        model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
+        self.query_one("#source-label", Label).update(
+            f"Source: {self.current_article_title}  |  Provider: {provider_name}  |  Model: {model_name}"
+        )
 
         self.query_one("#interaction-area").remove_class("hidden")
         self.query_one("#answer-input", TextArea).focus()
@@ -370,14 +480,20 @@ class CodeRecallApp(App):
         )
 
         try:
-            response = ollama.chat(
-                model=settings.MODEL_NAME,
-                messages=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": user_prompt}],
-                format=EvaluationResponse.model_json_schema(),
+            # Use schema for Ollama, simple json for OpenAI
+            response_format = (
+                EvaluationResponse.model_json_schema()
+                if self.current_provider == "ollama"
+                else "json"
             )
-            content = response["message"]["content"]
+            content = self.llm_chat(
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_format=response_format,
+            )
 
-            # Ollama with format=schema returns a JSON object matching the schema
             evaluation = EvaluationResponse.model_validate_json(content)
 
             self.call_from_thread(self.show_feedback, evaluation)

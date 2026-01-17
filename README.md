@@ -11,7 +11,7 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses local LLMs t
 ## 🚀 Features
 
 - **TUI Power**: A sleek terminal interface built with [Textual](https://textual.textualize.io/).
-- **Local Intelligence**: Uses [Ollama](https://ollama.ai/) with `gemma2:2b` to generate questions and evaluate your answers.
+- **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+M`.
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
 - **Deep Recall**: Not just multiple choice—type your answers and get strict technical feedback.
 - **VRAM Optimized**: Explicitly unloads models on exit to keep your GPU ready for other tasks.
@@ -21,7 +21,8 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses local LLMs t
 ### 1. Prerequisites
 - **Python 3.12+**
 - **[uv](https://github.com/astral-sh/uv)** (Python package manager)
-- **[Ollama](https://ollama.ai/)** (Installed and available in PATH)
+- **[OpenAI API Key](https://platform.openai.com/)** (for OpenAI provider) OR
+- **[Ollama](https://ollama.ai/)** (for local models, installed and available in PATH)
 
 ### 2. Installation
 Clone this repository and sync dependencies:
@@ -39,6 +40,9 @@ cp .env.example .env
 
 Open `.env` and adjust the variables:
 - `ARTICLES_DIR`: The path to your markdown files (defaults to `./articles`).
+- `DEFAULT_PROVIDER`: LLM provider to use - `openai` (default) or `ollama`.
+- `OPENAI_API_KEY`: Your OpenAI API key (required for OpenAI provider).
+- `OPENAI_MODEL_NAME`: The OpenAI model to use (defaults to `gpt-4.1-mini`).
 - `MODEL_NAME`: The Ollama model to use (defaults to `gemma2:2b`).
 
 ### 4. Prepare Articles
@@ -57,13 +61,15 @@ uv run main.py
 |-----|--------|
 | `Ctrl+S` | Submit Answer |
 | `Ctrl+N` | Next Question |
+| `Ctrl+T` | Toggle Provider |
 | `Ctrl+Q` | Quit Application |
 
 ## ⚙️ How it Works
 
-1. **Generation**: The app picks a random markdown file and asks Ollama to generate a conceptual question.
+1. **Generation**: The app picks a random markdown file and asks the LLM (OpenAI or Ollama) to generate a conceptual question.
 2. **Interaction**: You type your answer in the provided text area.
-3. **Evaluation**: Ollama acts as a "Strict Technical Interviewer," grading your response as **PASS** or **FAIL** with feedback on missing concepts.
+3. **Evaluation**: The LLM acts as a "Strict Technical Interviewer," grading your response as **PASS** or **FAIL** with feedback on missing concepts.
+4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The current provider is shown in the footer.
 
 ## 📝 Automation (Cron)
 
