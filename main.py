@@ -3,12 +3,12 @@ import logging
 import random
 import subprocess
 import time
+from typing import Any
 
 import ollama
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from rich.markdown import Markdown
-from settings import settings
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -23,6 +23,8 @@ from textual.widgets import (
     Static,
     TextArea,
 )
+
+from settings import settings
 
 logging.basicConfig(filename="debug.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -57,9 +59,8 @@ class StartupScreen(Screen):
     def run_startup_checks(self) -> None:
         """Run startup checks based on the default provider."""
         # Only check Ollama if it's the default provider
-        if settings.DEFAULT_PROVIDER == "ollama":
-            if not self.check_ollama():
-                return
+        if settings.DEFAULT_PROVIDER == "ollama" and not self.check_ollama():
+            return
 
         # Check Articles (always required)
         logging.info("Startup: Checking articles...")
@@ -333,7 +334,9 @@ class CodeRecallApp(App):
             model_names = [m["model"] for m in models.get("models", [])]
             if not any(settings.MODEL_NAME in name for name in model_names):
                 self.call_from_thread(
-                    lambda: self.notify(f"Model {settings.MODEL_NAME} not found. Please pull it first.", severity="error")
+                    lambda: self.notify(
+                        f"Model {settings.MODEL_NAME} not found. Please pull it first.", severity="error"
+                    )
                 )
                 return
             self.ollama_verified = True
@@ -350,21 +353,17 @@ class CodeRecallApp(App):
         self.update_provider_display()
         self.notify("Switched to Ollama", severity="information")
 
-    def llm_chat(
-        self, messages: list[dict[str, str]], response_format: dict | None = None
-    ) -> str:
+    def llm_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | str | None = None) -> str:
         """Route chat request to the current provider."""
         if self.current_provider == "openai":
             return self._openai_chat(messages, response_format)
         else:
             return self._ollama_chat(messages, response_format)
 
-    def _openai_chat(
-        self, messages: list[dict[str, str]], response_format: dict | None = None
-    ) -> str:
+    def _openai_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | str | None = None) -> str:
         """Send chat request to OpenAI."""
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "model": settings.OPENAI_MODEL_NAME,
             "messages": messages,
         }
@@ -373,18 +372,16 @@ class CodeRecallApp(App):
         response = client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 
-    def _ollama_chat(
-        self, messages: list[dict[str, str]], response_format: dict | None = None
-    ) -> str:
+    def _ollama_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | str | None = None) -> str:
         """Send chat request to Ollama."""
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "model": settings.MODEL_NAME,
             "messages": messages,
         }
         if response_format:
             kwargs["format"] = response_format
         response = ollama.chat(**kwargs)
-        return response["message"]["content"]
+        return str(response["message"]["content"])
 
     def on_startup_complete(self, message: StartupComplete) -> None:
         self.pop_screen()
@@ -481,10 +478,8 @@ class CodeRecallApp(App):
 
         try:
             # Use schema for Ollama, simple json for OpenAI
-            response_format = (
-                EvaluationResponse.model_json_schema()
-                if self.current_provider == "ollama"
-                else "json"
+            response_format: dict[str, Any] | str = (
+                dict(EvaluationResponse.model_json_schema()) if self.current_provider == "ollama" else "json"
             )
             content = self.llm_chat(
                 messages=[
