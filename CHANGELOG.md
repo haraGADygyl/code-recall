@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-02-03
+
+### Added
+
+- Commit-msg pre-commit hook using `conventional-pre-commit` to enforce `type(scope): description` format
+
 ## [0.1.0] - 2026-01-17
 
 ### Added

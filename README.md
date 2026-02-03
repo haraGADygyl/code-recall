@@ -71,6 +71,20 @@ uv run main.py
 3. **Evaluation**: The LLM acts as a "Strict Technical Interviewer," grading your response as **PASS** or **FAIL** with feedback on missing concepts.
 4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The current provider is shown in the footer.
 
+## 💬 Commit Convention
+
+This project enforces [Conventional Commits](https://www.conventionalcommits.org/) with a **required scope** via a `commit-msg` pre-commit hook. All commit messages must follow the format:
+
+```
+type(scope): description
+```
+
+Install the hook after cloning:
+
+```bash
+uv run pre-commit install --hook-type commit-msg
+```
+
 ## 📝 Automation (Cron)
 
 To run CodeRecall every 2 hours and have it pop up a terminal window:
