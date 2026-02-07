@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Default is the local ./articles directory
     ARTICLES_DIR: Path = Path("./articles")
 
+    # REST API topics file for question generation
+    REST_API_TOPICS_FILE: Path = Path("./data/rest_api_topics.json")
+
     # Pydantic Settings configuration
     model_config = SettingsConfigDict(
         env_file=".env",

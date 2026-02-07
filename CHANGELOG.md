@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-02-07
+
+### Added
+
+- External `data/rest_api_topics.json` with 40 broad REST API topic categories for diverse question generation
+- `REST_API_TOPICS_FILE` setting for configurable topics file path
+
+### Changed
+
+- REST API questions now randomly select a topic from the topics file to avoid repeated questions
+- Shortened question and answer format for quick knowledge refresh
+
 ## [0.1.2] - 2026-02-07
 
 ### Added

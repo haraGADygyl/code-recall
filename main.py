@@ -432,15 +432,13 @@ class CodeRecallApp(App):
     @work(thread=True)
     def generate_question(self) -> None:
         if self.current_question_mode == "rest-api":
+            topics = json.loads(settings.REST_API_TOPICS_FILE.read_text(encoding="utf-8"))
+            topic = random.choice(topics)
             user_prompt = (
-                "Generate a single conceptual REST API design question. "
-                "Topics can include: HTTP methods and their semantics, status codes, "
-                "URL/resource naming conventions, API versioning strategies, "
-                "pagination patterns, error response design, authentication patterns "
-                "(OAuth, API keys, JWT), HATEOAS, idempotency, rate limiting, "
-                "content negotiation, caching headers, or REST maturity levels. "
-                "The question should test understanding of REST principles, not ask for code. "
-                "Do not repeat previous questions. "
+                f"Generate a single short conceptual question about the following REST API topic: {topic}. "
+                "Keep the question brief (1-2 sentences). "
+                "The expected answer should be concise (2-3 sentences max). "
+                "Do not ask for code. "
                 'Return JSON format: {"question": "..."}'
             )
         else:
@@ -509,7 +507,8 @@ class CodeRecallApp(App):
             user_prompt = (
                 f"Question: {self.current_question}\n"
                 f"User Answer: {user_answer}\n\n"
-                "Evaluate this answer about REST API design based on your knowledge of REST principles."
+                "Evaluate this answer about REST API design. "
+                "Keep the explanation and correct answer concise (2-3 sentences each)."
             )
         else:
             user_prompt = (
