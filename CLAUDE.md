@@ -54,6 +54,10 @@ Environment variables in `.env` (see `.env.example`):
 - `MODEL_NAME` - Ollama model to use (default: `gemma2:2b`)
 - `DISPLAY`, `XAUTHORITY`, `DBUS_SESSION_BUS_ADDRESS` - For cron GUI integration
 
+## Changelog
+
+When updating `CHANGELOG.md`, never add entries under `[Unreleased]`. Always create a new patch version (e.g., `[0.1.3]`) unless a different version bump is specified.
+
 ## Code Standards
 
 Follow `.agent/rules/python-expert.md`:

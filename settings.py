@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Default LLM provider: "openai" or "ollama"
     DEFAULT_PROVIDER: Literal["openai", "ollama"] = "openai"
 
+    # Default question mode: "articles" or "rest-api"
+    DEFAULT_QUESTION_MODE: Literal["articles", "rest-api"] = "rest-api"
+
     # Directory containing the markdown articles
     # Default is the local ./articles directory
     ARTICLES_DIR: Path = Path("./articles")

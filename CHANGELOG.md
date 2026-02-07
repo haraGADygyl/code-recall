@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-07
+
+### Added
+
+- REST API Design question mode with toggle (`Ctrl+R`) between articles and REST API topics
+- `DEFAULT_QUESTION_MODE` setting to configure startup mode (`articles` or `rest-api`)
+- REST API questions covering HTTP methods, status codes, versioning, auth patterns, and more
+
+### Changed
+
+- Articles directory check at startup only runs in articles mode
+
 ## [0.1.1] - 2026-02-03
 
 ### Added

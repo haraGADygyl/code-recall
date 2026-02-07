@@ -62,13 +62,14 @@ class StartupScreen(Screen):
         if settings.DEFAULT_PROVIDER == "ollama" and not self.check_ollama():
             return
 
-        # Check Articles (always required)
-        logging.info("Startup: Checking articles...")
-        self.update_status("Checking articles...")
-        if not settings.ARTICLES_DIR.exists() or not list(settings.ARTICLES_DIR.glob("*.md")):
-            logging.error("Startup: No articles found.")
-            self.fail_startup(f"No .md files found in {settings.ARTICLES_DIR.absolute()}")
-            return
+        # Check Articles (only required in articles mode)
+        if settings.DEFAULT_QUESTION_MODE == "articles":
+            logging.info("Startup: Checking articles...")
+            self.update_status("Checking articles...")
+            if not settings.ARTICLES_DIR.exists() or not list(settings.ARTICLES_DIR.glob("*.md")):
+                logging.error("Startup: No articles found.")
+                self.fail_startup(f"No .md files found in {settings.ARTICLES_DIR.absolute()}")
+                return
 
         logging.info("Startup: Complete.")
         self.update_status("Ready!")
@@ -252,12 +253,14 @@ class CodeRecallApp(App):
         ("ctrl+s", "submit_answer", "Submit"),
         ("ctrl+n", "next_question", "Next"),
         ("ctrl+t", "toggle_provider", "Toggle Provider"),
+        ("ctrl+r", "toggle_question_mode", "Toggle Mode"),
     ]
 
     current_article_text: str = ""
     current_article_title: str = ""
     current_question: str = ""
     current_provider: reactive[str] = reactive(settings.DEFAULT_PROVIDER)
+    current_question_mode: reactive[str] = reactive(settings.DEFAULT_QUESTION_MODE)
     ollama_verified: bool = False
 
     class StartupComplete(Message):
@@ -300,11 +303,10 @@ class CodeRecallApp(App):
         """Update the provider status in the source label."""
         provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
         model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
+        mode_label = "REST API Design" if self.current_question_mode == "rest-api" else self.current_article_title
         try:
             source_label = self.query_one("#source-label", Label)
-            source_label.update(
-                f"Source: {self.current_article_title}  |  Provider: {provider_name}  |  Model: {model_name}"
-            )
+            source_label.update(f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}")
         except Exception as e:
             logging.error(f"Failed to update provider display: {e}")
 
@@ -323,6 +325,19 @@ class CodeRecallApp(App):
             self.current_provider = "openai"
             self.update_provider_display()
             self.notify("Switched to OpenAI", severity="information")
+
+    def action_toggle_question_mode(self) -> None:
+        """Toggle between Articles and REST API Design question modes."""
+        if self.current_question_mode == "articles":
+            self.current_question_mode = "rest-api"
+            self.notify("Switched to REST API Design mode", severity="information")
+        else:
+            self.current_question_mode = "articles"
+            self.notify("Switched to Articles mode", severity="information")
+
+    def watch_current_question_mode(self, mode: str) -> None:
+        """Update UI when question mode changes."""
+        self.update_provider_display()
 
     @work(thread=True)
     def verify_and_switch_to_ollama(self) -> None:
@@ -393,31 +408,48 @@ class CodeRecallApp(App):
         self.query_one("#interaction-area").add_class("hidden")
         self.query_one("#feedback-container").add_class("hidden")
         self.query_one("#question-box", Static).update("Generating question...")
-        self.query_one("#main-status", Label).update("Selecting article and generating question...")
         self.query_one("#main-status", Label).remove_class("hidden")
         self.query_one("#answer-input", TextArea).text = ""
         self.query_one("#btn-submit").remove_class("hidden")
         self.query_one("#btn-next").add_class("hidden")
 
-        # Select File
-        files = list(settings.ARTICLES_DIR.glob("*.md"))
-        if not files:
-            return  # Should be handled by startup check
-
-        selected_file = random.choice(files)
-        self.current_article_title = selected_file.name
-        self.current_article_text = selected_file.read_text(encoding="utf-8")
+        if self.current_question_mode == "articles":
+            self.query_one("#main-status", Label).update("Selecting article and generating question...")
+            files = list(settings.ARTICLES_DIR.glob("*.md"))
+            if not files:
+                self.notify("No articles found", severity="error")
+                return
+            selected_file = random.choice(files)
+            self.current_article_title = selected_file.name
+            self.current_article_text = selected_file.read_text(encoding="utf-8")
+        else:
+            self.query_one("#main-status", Label).update("Generating REST API question...")
+            self.current_article_title = "REST API Design"
+            self.current_article_text = ""
 
         self.generate_question()
 
     @work(thread=True)
     def generate_question(self) -> None:
-        user_prompt = (
-            f"Read the following text:\n\n{self.current_article_text}\n\n"
-            "Ask a single conceptual Python3 question based on this text to test understanding. "
-            "Never ask for code examples or implementation details."
-            'Return JSON format: {"question": "..."}'
-        )
+        if self.current_question_mode == "rest-api":
+            user_prompt = (
+                "Generate a single conceptual REST API design question. "
+                "Topics can include: HTTP methods and their semantics, status codes, "
+                "URL/resource naming conventions, API versioning strategies, "
+                "pagination patterns, error response design, authentication patterns "
+                "(OAuth, API keys, JWT), HATEOAS, idempotency, rate limiting, "
+                "content negotiation, caching headers, or REST maturity levels. "
+                "The question should test understanding of REST principles, not ask for code. "
+                "Do not repeat previous questions. "
+                'Return JSON format: {"question": "..."}'
+            )
+        else:
+            user_prompt = (
+                f"Read the following text:\n\n{self.current_article_text}\n\n"
+                "Ask a single conceptual Python3 question based on this text to test understanding. "
+                "Never ask for code examples or implementation details."
+                'Return JSON format: {"question": "..."}'
+            )
 
         try:
             response_text = self.llm_chat(
@@ -440,8 +472,9 @@ class CodeRecallApp(App):
         q_box.update(Markdown(f"**Question:**\n{self.current_question}"))
         provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
         model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
+        mode_label = "REST API Design" if self.current_question_mode == "rest-api" else self.current_article_title
         self.query_one("#source-label", Label).update(
-            f"Source: {self.current_article_title}  |  Provider: {provider_name}  |  Model: {model_name}"
+            f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}"
         )
 
         self.query_one("#interaction-area").remove_class("hidden")
@@ -472,9 +505,18 @@ class CodeRecallApp(App):
             "2. 'explanation': A concise explanation of why it passed or failed.\n"
             "3. 'answer': The correct answer to the question, independent of the user's response."
         )
-        user_prompt = (
-            f"Context: {self.current_article_text}\nQuestion: {self.current_question}\nUser Answer: {user_answer}\n\n"
-        )
+        if self.current_question_mode == "rest-api":
+            user_prompt = (
+                f"Question: {self.current_question}\n"
+                f"User Answer: {user_answer}\n\n"
+                "Evaluate this answer about REST API design based on your knowledge of REST principles."
+            )
+        else:
+            user_prompt = (
+                f"Context: {self.current_article_text}\n"
+                f"Question: {self.current_question}\n"
+                f"User Answer: {user_answer}\n\n"
+            )
 
         try:
             # Use schema for Ollama, simple json for OpenAI
