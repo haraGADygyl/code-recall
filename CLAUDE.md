@@ -58,6 +58,10 @@ Environment variables in `.env` (see `.env.example`):
 
 When updating `CHANGELOG.md`, never add entries under `[Unreleased]`. Always create a new patch version (e.g., `[0.1.3]`) unless a different version bump is specified.
 
+## Git Workflow
+
+Always push to `origin` after committing.
+
 ## Code Standards
 
 Follow `.agent/rules/python-expert.md`:
