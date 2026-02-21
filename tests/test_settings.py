@@ -57,6 +57,20 @@ class TestSettingsValidation:
             _make_settings(DEFAULT_PROVIDER="invalid")
 
 
+class TestQuestionModes:
+    def test_valid_question_mode_fastapi(self) -> None:
+        s = _make_settings(DEFAULT_QUESTION_MODE="fastapi")
+        assert s.DEFAULT_QUESTION_MODE == "fastapi"
+
+    def test_default_fastapi_topics_file(self) -> None:
+        s = _make_settings()
+        assert Path("./data/fastapi_topics.json") == s.FASTAPI_TOPICS_FILE
+
+    def test_invalid_question_mode_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            _make_settings(DEFAULT_QUESTION_MODE="invalid-mode")
+
+
 class TestSettingsOverrides:
     def test_custom_model_name(self) -> None:
         s = _make_settings(MODEL_NAME="llama3:8b")

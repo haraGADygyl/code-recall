@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-02-21
+
+### Added
+
+- FastAPI question mode for interview preparation with toggle (`Ctrl+R` cycles through all modes)
+- External `data/fastapi_topics.json` with 41 FastAPI topic categories
+- `FASTAPI_TOPICS_FILE` setting for configurable topics file path
+
+### Changed
+
+- Question mode toggle (`Ctrl+R`) now cycles through three modes: Articles, REST API Design, and FastAPI
+
 ## [0.1.3] - 2026-02-07
 
 ### Added

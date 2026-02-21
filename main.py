@@ -303,7 +303,8 @@ class CodeRecallApp(App):
         """Update the provider status in the source label."""
         provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
         model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
-        mode_label = "REST API Design" if self.current_question_mode == "rest-api" else self.current_article_title
+        mode_labels = {"rest-api": "REST API Design", "fastapi": "FastAPI"}
+        mode_label = mode_labels.get(self.current_question_mode, self.current_article_title)
         try:
             source_label = self.query_one("#source-label", Label)
             source_label.update(f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}")
@@ -327,13 +328,12 @@ class CodeRecallApp(App):
             self.notify("Switched to OpenAI", severity="information")
 
     def action_toggle_question_mode(self) -> None:
-        """Toggle between Articles and REST API Design question modes."""
-        if self.current_question_mode == "articles":
-            self.current_question_mode = "rest-api"
-            self.notify("Switched to REST API Design mode", severity="information")
-        else:
-            self.current_question_mode = "articles"
-            self.notify("Switched to Articles mode", severity="information")
+        """Cycle between Articles, REST API Design, and FastAPI question modes."""
+        modes = ["articles", "rest-api", "fastapi"]
+        mode_names = {"articles": "Articles", "rest-api": "REST API Design", "fastapi": "FastAPI"}
+        current_idx = modes.index(self.current_question_mode)
+        self.current_question_mode = modes[(current_idx + 1) % len(modes)]
+        self.notify(f"Switched to {mode_names[self.current_question_mode]} mode", severity="information")
 
     def watch_current_question_mode(self, mode: str) -> None:
         """Update UI when question mode changes."""
@@ -422,9 +422,13 @@ class CodeRecallApp(App):
             selected_file = random.choice(files)
             self.current_article_title = selected_file.name
             self.current_article_text = selected_file.read_text(encoding="utf-8")
-        else:
+        elif self.current_question_mode == "rest-api":
             self.query_one("#main-status", Label).update("Generating REST API question...")
             self.current_article_title = "REST API Design"
+            self.current_article_text = ""
+        else:
+            self.query_one("#main-status", Label).update("Generating FastAPI question...")
+            self.current_article_title = "FastAPI"
             self.current_article_text = ""
 
         self.generate_question()
@@ -436,6 +440,16 @@ class CodeRecallApp(App):
             topic = random.choice(topics)
             user_prompt = (
                 f"Generate a single short conceptual question about the following REST API topic: {topic}. "
+                "Keep the question brief (1-2 sentences). "
+                "The expected answer should be concise (2-3 sentences max). "
+                "Do not ask for code. "
+                'Return JSON format: {"question": "..."}'
+            )
+        elif self.current_question_mode == "fastapi":
+            topics = json.loads(settings.FASTAPI_TOPICS_FILE.read_text(encoding="utf-8"))
+            topic = random.choice(topics)
+            user_prompt = (
+                f"Generate a single short conceptual question about the following FastAPI topic: {topic}. "
                 "Keep the question brief (1-2 sentences). "
                 "The expected answer should be concise (2-3 sentences max). "
                 "Do not ask for code. "
@@ -470,7 +484,8 @@ class CodeRecallApp(App):
         q_box.update(Markdown(f"**Question:**\n{self.current_question}"))
         provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
         model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
-        mode_label = "REST API Design" if self.current_question_mode == "rest-api" else self.current_article_title
+        mode_labels = {"rest-api": "REST API Design", "fastapi": "FastAPI"}
+        mode_label = mode_labels.get(self.current_question_mode, self.current_article_title)
         self.query_one("#source-label", Label).update(
             f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}"
         )
@@ -508,6 +523,13 @@ class CodeRecallApp(App):
                 f"Question: {self.current_question}\n"
                 f"User Answer: {user_answer}\n\n"
                 "Evaluate this answer about REST API design. "
+                "Keep the explanation and correct answer concise (2-3 sentences each)."
+            )
+        elif self.current_question_mode == "fastapi":
+            user_prompt = (
+                f"Question: {self.current_question}\n"
+                f"User Answer: {user_answer}\n\n"
+                "Evaluate this answer about FastAPI development. "
                 "Keep the explanation and correct answer concise (2-3 sentences each)."
             )
         else:
