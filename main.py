@@ -38,6 +38,19 @@ class EvaluationResponse(BaseModel):
     )
 
 
+class SystemDesignEvaluationResponse(BaseModel):
+    score: int = Field(..., ge=1, le=10, description="Score from 1 to 10")
+    explanation: str = Field(
+        ...,
+        description="Detailed explanation of the score covering scalability, "
+        "trade-offs, component choices, and bottleneck awareness.",
+    )
+    answer: str = Field(
+        ...,
+        description="A comprehensive reference answer to the system design question.",
+    )
+
+
 class StartupScreen(Screen):
     """Screen for checking dependencies."""
 
@@ -215,6 +228,21 @@ class CodeRecallApp(App):
         text-style: bold;
     }
 
+    .score-high {
+        color: #00ff00;
+        text-style: bold;
+    }
+
+    .score-mid {
+        color: #ffaa00;
+        text-style: bold;
+    }
+
+    .score-low {
+        color: #ff0000;
+        text-style: bold;
+    }
+
     TextArea {
         height: auto;
         border: solid #555;
@@ -255,6 +283,13 @@ class CodeRecallApp(App):
         ("ctrl+t", "toggle_provider", "Toggle Provider"),
         ("ctrl+r", "toggle_question_mode", "Toggle Mode"),
     ]
+
+    MODE_LABELS: dict[str, str] = {
+        "articles": "Articles",
+        "rest-api": "REST API Design",
+        "fastapi": "FastAPI",
+        "system-design": "System Design",
+    }
 
     current_article_text: str = ""
     current_article_title: str = ""
@@ -303,8 +338,7 @@ class CodeRecallApp(App):
         """Update the provider status in the source label."""
         provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
         model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
-        mode_labels = {"rest-api": "REST API Design", "fastapi": "FastAPI"}
-        mode_label = mode_labels.get(self.current_question_mode, self.current_article_title)
+        mode_label = self.MODE_LABELS.get(self.current_question_mode, self.current_article_title)
         try:
             source_label = self.query_one("#source-label", Label)
             source_label.update(f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}")
@@ -328,12 +362,11 @@ class CodeRecallApp(App):
             self.notify("Switched to OpenAI", severity="information")
 
     def action_toggle_question_mode(self) -> None:
-        """Cycle between Articles, REST API Design, and FastAPI question modes."""
-        modes = ["articles", "rest-api", "fastapi"]
-        mode_names = {"articles": "Articles", "rest-api": "REST API Design", "fastapi": "FastAPI"}
+        """Cycle between Articles, REST API Design, FastAPI, and System Design question modes."""
+        modes = list(self.MODE_LABELS)
         current_idx = modes.index(self.current_question_mode)
         self.current_question_mode = modes[(current_idx + 1) % len(modes)]
-        self.notify(f"Switched to {mode_names[self.current_question_mode]} mode", severity="information")
+        self.notify(f"Switched to {self.MODE_LABELS[self.current_question_mode]} mode", severity="information")
 
     def watch_current_question_mode(self, mode: str) -> None:
         """Update UI when question mode changes."""
@@ -422,13 +455,10 @@ class CodeRecallApp(App):
             selected_file = random.choice(files)
             self.current_article_title = selected_file.name
             self.current_article_text = selected_file.read_text(encoding="utf-8")
-        elif self.current_question_mode == "rest-api":
-            self.query_one("#main-status", Label).update("Generating REST API question...")
-            self.current_article_title = "REST API Design"
-            self.current_article_text = ""
         else:
-            self.query_one("#main-status", Label).update("Generating FastAPI question...")
-            self.current_article_title = "FastAPI"
+            label = self.MODE_LABELS[self.current_question_mode]
+            self.query_one("#main-status", Label).update(f"Generating {label} question...")
+            self.current_article_title = label
             self.current_article_text = ""
 
         self.generate_question()
@@ -450,6 +480,16 @@ class CodeRecallApp(App):
             topic = random.choice(topics)
             user_prompt = (
                 f"Generate a single short conceptual question about the following FastAPI topic: {topic}. "
+                "Keep the question brief (1-2 sentences). "
+                "The expected answer should be concise (2-3 sentences max). "
+                "Do not ask for code. "
+                'Return JSON format: {"question": "..."}'
+            )
+        elif self.current_question_mode == "system-design":
+            topics = json.loads(settings.SYSTEM_DESIGN_TOPICS_FILE.read_text(encoding="utf-8"))
+            topic = random.choice(topics)
+            user_prompt = (
+                f"Generate a single short conceptual question about the following system design topic: {topic}. "
                 "Keep the question brief (1-2 sentences). "
                 "The expected answer should be concise (2-3 sentences max). "
                 "Do not ask for code. "
@@ -482,13 +522,7 @@ class CodeRecallApp(App):
         self.query_one("#main-status", Label).add_class("hidden")
         q_box = self.query_one("#question-box", Static)
         q_box.update(Markdown(f"**Question:**\n{self.current_question}"))
-        provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
-        model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
-        mode_labels = {"rest-api": "REST API Design", "fastapi": "FastAPI"}
-        mode_label = mode_labels.get(self.current_question_mode, self.current_article_title)
-        self.query_one("#source-label", Label).update(
-            f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}"
-        )
+        self.update_provider_display()
 
         self.query_one("#interaction-area").remove_class("hidden")
         self.query_one("#answer-input", TextArea).focus()
@@ -511,39 +545,70 @@ class CodeRecallApp(App):
 
     @work(thread=True)
     def evaluate_answer(self, user_answer: str) -> None:
-        sys_prompt = (
-            "You are a strict technical interviewer. Evaluate the user's answer.\n"
-            "Your output must be a valid JSON object with three fields:\n"
-            "1. 'result': 'PASS' or 'FAIL'\n"
-            "2. 'explanation': A concise explanation of why it passed or failed.\n"
-            "3. 'answer': The correct answer to the question, independent of the user's response."
-        )
-        if self.current_question_mode == "rest-api":
-            user_prompt = (
-                f"Question: {self.current_question}\n"
-                f"User Answer: {user_answer}\n\n"
-                "Evaluate this answer about REST API design. "
-                "Keep the explanation and correct answer concise (2-3 sentences each)."
+        is_system_design = self.current_question_mode == "system-design"
+
+        if is_system_design:
+            sys_prompt = (
+                "You are an expert system design interviewer. Score the user's answer on a scale of 1 to 10.\n"
+                "Evaluate based on these criteria:\n"
+                "- Scalability awareness: Does the answer address how the system scales?\n"
+                "- Trade-off analysis: Does the answer discuss pros/cons of design choices?\n"
+                "- Component selection: Are appropriate technologies and components chosen?\n"
+                "- Bottleneck identification: Does the answer identify potential bottlenecks?\n"
+                "Your output must be a valid JSON object with three fields:\n"
+                "1. 'score': An integer from 1 to 10\n"
+                "2. 'explanation': A detailed explanation of the score covering each criterion.\n"
+                "3. 'answer': A comprehensive reference answer to the question."
             )
-        elif self.current_question_mode == "fastapi":
             user_prompt = (
                 f"Question: {self.current_question}\n"
                 f"User Answer: {user_answer}\n\n"
-                "Evaluate this answer about FastAPI development. "
-                "Keep the explanation and correct answer concise (2-3 sentences each)."
+                "Score this system design answer from 1 to 10. "
+                "A score of 1-3 means major gaps in understanding. "
+                "A score of 4-6 means partial understanding with notable omissions. "
+                "A score of 7-8 means solid understanding with minor gaps. "
+                "A score of 9-10 means exceptional, comprehensive answer."
             )
         else:
-            user_prompt = (
-                f"Context: {self.current_article_text}\n"
-                f"Question: {self.current_question}\n"
-                f"User Answer: {user_answer}\n\n"
+            sys_prompt = (
+                "You are a strict technical interviewer. Evaluate the user's answer.\n"
+                "Your output must be a valid JSON object with three fields:\n"
+                "1. 'result': 'PASS' or 'FAIL'\n"
+                "2. 'explanation': A concise explanation of why it passed or failed.\n"
+                "3. 'answer': The correct answer to the question, independent of the user's response."
             )
+            if self.current_question_mode == "rest-api":
+                user_prompt = (
+                    f"Question: {self.current_question}\n"
+                    f"User Answer: {user_answer}\n\n"
+                    "Evaluate this answer about REST API design. "
+                    "Keep the explanation and correct answer concise (2-3 sentences each)."
+                )
+            elif self.current_question_mode == "fastapi":
+                user_prompt = (
+                    f"Question: {self.current_question}\n"
+                    f"User Answer: {user_answer}\n\n"
+                    "Evaluate this answer about FastAPI development. "
+                    "Keep the explanation and correct answer concise (2-3 sentences each)."
+                )
+            else:
+                user_prompt = (
+                    f"Context: {self.current_article_text}\n"
+                    f"Question: {self.current_question}\n"
+                    f"User Answer: {user_answer}\n\n"
+                )
 
         try:
             # Use schema for Ollama, simple json for OpenAI
-            response_format: dict[str, Any] | str = (
-                dict(EvaluationResponse.model_json_schema()) if self.current_provider == "ollama" else "json"
-            )
+            if self.current_provider == "ollama":
+                schema = (
+                    SystemDesignEvaluationResponse.model_json_schema()
+                    if is_system_design
+                    else EvaluationResponse.model_json_schema()
+                )
+                response_format: dict[str, Any] | str = dict(schema)
+            else:
+                response_format = "json"
             content = self.llm_chat(
                 messages=[
                     {"role": "system", "content": sys_prompt},
@@ -552,37 +617,48 @@ class CodeRecallApp(App):
                 response_format=response_format,
             )
 
-            evaluation = EvaluationResponse.model_validate_json(content)
-
-            self.call_from_thread(self.show_feedback, evaluation)
+            if is_system_design:
+                sd_evaluation = SystemDesignEvaluationResponse.model_validate_json(content)
+                self.call_from_thread(self.show_system_design_feedback, sd_evaluation)
+            else:
+                evaluation = EvaluationResponse.model_validate_json(content)
+                self.call_from_thread(self.show_feedback, evaluation)
 
         except Exception as e:
             logging.error(f"Evaluation error: {e}")
             self.call_from_thread(lambda ex=e: self.query_one("#feedback-content", Static).update(f"Error: {ex}"))
 
-    def show_feedback(self, evaluation: EvaluationResponse) -> None:
+    def _display_feedback(self, status_text: str, status_class: str, explanation: str, answer: str) -> None:
         self.query_one("#main-status", Label).add_class("hidden")
 
-        # Status Label
         status_lbl = self.query_one("#feedback-status", Label)
-        status_lbl.update(evaluation.result)
-        status_lbl.remove_class("pass", "fail")
-        status_lbl.add_class("pass" if evaluation.result.upper() == "PASS" else "fail")
+        status_lbl.update(status_text)
+        status_lbl.remove_class("pass", "fail", "score-high", "score-mid", "score-low")
+        status_lbl.add_class(status_class)
 
-        # Explanation
-        fb_content = self.query_one("#feedback-content", Static)
-        fb_content.update(Markdown(evaluation.explanation))
+        self.query_one("#feedback-content", Static).update(Markdown(explanation))
 
-        # Model Answer
         self.query_one("#model-answer-label").remove_class("hidden")
         ans_content = self.query_one("#model-answer-content", Static)
         ans_content.remove_class("hidden")
-        ans_content.update(Markdown(evaluation.answer))
+        ans_content.update(Markdown(answer))
 
         self.query_one("#feedback-container").remove_class("hidden")
-
         self.query_one("#btn-next").remove_class("hidden")
         self.query_one("#btn-next").focus()
+
+    def show_feedback(self, evaluation: EvaluationResponse) -> None:
+        status_class = "pass" if evaluation.result.upper() == "PASS" else "fail"
+        self._display_feedback(evaluation.result, status_class, evaluation.explanation, evaluation.answer)
+
+    def show_system_design_feedback(self, evaluation: SystemDesignEvaluationResponse) -> None:
+        if evaluation.score >= 8:
+            status_class = "score-high"
+        elif evaluation.score >= 5:
+            status_class = "score-mid"
+        else:
+            status_class = "score-low"
+        self._display_feedback(f"Score: {evaluation.score}/10", status_class, evaluation.explanation, evaluation.answer)
 
     @on(Button.Pressed, "#btn-next")
     def action_next_question(self) -> None:

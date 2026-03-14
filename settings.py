@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     # Default LLM provider: "openai" or "ollama"
     DEFAULT_PROVIDER: Literal["openai", "ollama"] = "openai"
 
-    # Default question mode: "articles", "rest-api", or "fastapi"
-    DEFAULT_QUESTION_MODE: Literal["articles", "rest-api", "fastapi"] = "fastapi"
+    # Default question mode: "articles", "rest-api", "fastapi", or "system-design"
+    DEFAULT_QUESTION_MODE: Literal["articles", "rest-api", "fastapi", "system-design"] = "system-design"
 
     # Directory containing the markdown articles
     # Default is the local ./articles directory
@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     # FastAPI topics file for question generation
     FASTAPI_TOPICS_FILE: Path = Path("./data/fastapi_topics.json")
+
+    # System Design topics file for question generation
+    SYSTEM_DESIGN_TOPICS_FILE: Path = Path("./data/system_design_topics.json")
 
     # Pydantic Settings configuration
     model_config = SettingsConfigDict(

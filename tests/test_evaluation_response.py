@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from main import EvaluationResponse
+from main import EvaluationResponse, SystemDesignEvaluationResponse
 
 
 class TestEvaluationResponse:
@@ -52,3 +52,69 @@ class TestEvaluationResponse:
     def test_invalid_json_raises_error(self) -> None:
         with pytest.raises(ValidationError):
             EvaluationResponse.model_validate_json('{"result": "PASS"}')
+
+
+class TestSystemDesignEvaluationResponse:
+    def test_valid_high_score(self) -> None:
+        resp = SystemDesignEvaluationResponse(
+            score=9,
+            explanation="Excellent coverage of scalability and trade-offs.",
+            answer="A comprehensive reference answer.",
+        )
+        assert resp.score == 9
+        assert resp.explanation == "Excellent coverage of scalability and trade-offs."
+
+    def test_valid_low_score(self) -> None:
+        resp = SystemDesignEvaluationResponse(
+            score=2,
+            explanation="Major gaps in understanding.",
+            answer="The correct approach involves...",
+        )
+        assert resp.score == 2
+
+    def test_score_below_minimum_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            SystemDesignEvaluationResponse(
+                score=0,
+                explanation="Some explanation.",
+                answer="Some answer.",
+            )
+
+    def test_score_above_maximum_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            SystemDesignEvaluationResponse(
+                score=11,
+                explanation="Some explanation.",
+                answer="Some answer.",
+            )
+
+    def test_missing_score_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            SystemDesignEvaluationResponse(
+                explanation="Some explanation.",
+                answer="Some answer.",
+            )  # type: ignore[call-arg]
+
+    def test_missing_explanation_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            SystemDesignEvaluationResponse(
+                score=7,
+                answer="Some answer.",
+            )  # type: ignore[call-arg]
+
+    def test_missing_answer_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            SystemDesignEvaluationResponse(
+                score=7,
+                explanation="Some explanation.",
+            )  # type: ignore[call-arg]
+
+    def test_from_json(self) -> None:
+        json_str = '{"score": 8, "explanation": "Good coverage.", "answer": "Reference answer."}'
+        resp = SystemDesignEvaluationResponse.model_validate_json(json_str)
+        assert resp.score == 8
+        assert resp.answer == "Reference answer."
+
+    def test_invalid_json_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            SystemDesignEvaluationResponse.model_validate_json('{"score": 5}')

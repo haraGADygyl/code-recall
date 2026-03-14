@@ -66,6 +66,14 @@ class TestQuestionModes:
         s = _make_settings()
         assert Path("./data/fastapi_topics.json") == s.FASTAPI_TOPICS_FILE
 
+    def test_valid_question_mode_system_design(self) -> None:
+        s = _make_settings(DEFAULT_QUESTION_MODE="system-design")
+        assert s.DEFAULT_QUESTION_MODE == "system-design"
+
+    def test_default_system_design_topics_file(self) -> None:
+        s = _make_settings()
+        assert Path("./data/system_design_topics.json") == s.SYSTEM_DESIGN_TOPICS_FILE
+
     def test_invalid_question_mode_rejected(self) -> None:
         with pytest.raises(ValidationError):
             _make_settings(DEFAULT_QUESTION_MODE="invalid-mode")
