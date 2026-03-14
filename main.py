@@ -291,6 +291,12 @@ class CodeRecallApp(App):
         "system-design": "System Design",
     }
 
+    TOPIC_FILES: dict[str, str] = {
+        "rest-api": "REST_API_TOPICS_FILE",
+        "fastapi": "FASTAPI_TOPICS_FILE",
+        "system-design": "SYSTEM_DESIGN_TOPICS_FILE",
+    }
+
     current_article_text: str = ""
     current_article_title: str = ""
     current_question: str = ""
@@ -465,31 +471,14 @@ class CodeRecallApp(App):
 
     @work(thread=True)
     def generate_question(self) -> None:
-        if self.current_question_mode == "rest-api":
-            topics = json.loads(settings.REST_API_TOPICS_FILE.read_text(encoding="utf-8"))
+        topic_file_attr = self.TOPIC_FILES.get(self.current_question_mode)
+        if topic_file_attr:
+            topics_file = getattr(settings, topic_file_attr)
+            topics = json.loads(topics_file.read_text(encoding="utf-8"))
             topic = random.choice(topics)
+            mode_label = self.MODE_LABELS[self.current_question_mode]
             user_prompt = (
-                f"Generate a single short conceptual question about the following REST API topic: {topic}. "
-                "Keep the question brief (1-2 sentences). "
-                "The expected answer should be concise (2-3 sentences max). "
-                "Do not ask for code. "
-                'Return JSON format: {"question": "..."}'
-            )
-        elif self.current_question_mode == "fastapi":
-            topics = json.loads(settings.FASTAPI_TOPICS_FILE.read_text(encoding="utf-8"))
-            topic = random.choice(topics)
-            user_prompt = (
-                f"Generate a single short conceptual question about the following FastAPI topic: {topic}. "
-                "Keep the question brief (1-2 sentences). "
-                "The expected answer should be concise (2-3 sentences max). "
-                "Do not ask for code. "
-                'Return JSON format: {"question": "..."}'
-            )
-        elif self.current_question_mode == "system-design":
-            topics = json.loads(settings.SYSTEM_DESIGN_TOPICS_FILE.read_text(encoding="utf-8"))
-            topic = random.choice(topics)
-            user_prompt = (
-                f"Generate a single short conceptual question about the following system design topic: {topic}. "
+                f"Generate a single short conceptual question about the following {mode_label} topic: {topic}. "
                 "Keep the question brief (1-2 sentences). "
                 "The expected answer should be concise (2-3 sentences max). "
                 "Do not ask for code. "
@@ -545,25 +534,26 @@ class CodeRecallApp(App):
 
     @work(thread=True)
     def evaluate_answer(self, user_answer: str) -> None:
-        is_system_design = self.current_question_mode == "system-design"
+        use_score_eval = self.current_question_mode in self.TOPIC_FILES
 
-        if is_system_design:
+        if use_score_eval:
+            mode_label = self.MODE_LABELS[self.current_question_mode]
             sys_prompt = (
-                "You are an expert system design interviewer. Score the user's answer on a scale of 1 to 10.\n"
+                "You are a strict technical interviewer. "
+                "Score the user's answer on a scale of 1 to 10.\n"
                 "Evaluate based on these criteria:\n"
-                "- Scalability awareness: Does the answer address how the system scales?\n"
-                "- Trade-off analysis: Does the answer discuss pros/cons of design choices?\n"
-                "- Component selection: Are appropriate technologies and components chosen?\n"
-                "- Bottleneck identification: Does the answer identify potential bottlenecks?\n"
+                "- Correctness: Is the answer technically accurate?\n"
+                "- Depth: Does the answer demonstrate thorough understanding?\n"
+                "- Practical awareness: Does the answer consider real-world trade-offs?\n"
                 "Your output must be a valid JSON object with three fields:\n"
                 "1. 'score': An integer from 1 to 10\n"
-                "2. 'explanation': A detailed explanation of the score covering each criterion.\n"
+                "2. 'explanation': A detailed explanation of the score.\n"
                 "3. 'answer': A comprehensive reference answer to the question."
             )
             user_prompt = (
                 f"Question: {self.current_question}\n"
                 f"User Answer: {user_answer}\n\n"
-                "Score this system design answer from 1 to 10. "
+                f"Score this {mode_label} answer from 1 to 10. "
                 "A score of 1-3 means major gaps in understanding. "
                 "A score of 4-6 means partial understanding with notable omissions. "
                 "A score of 7-8 means solid understanding with minor gaps. "
@@ -577,33 +567,18 @@ class CodeRecallApp(App):
                 "2. 'explanation': A concise explanation of why it passed or failed.\n"
                 "3. 'answer': The correct answer to the question, independent of the user's response."
             )
-            if self.current_question_mode == "rest-api":
-                user_prompt = (
-                    f"Question: {self.current_question}\n"
-                    f"User Answer: {user_answer}\n\n"
-                    "Evaluate this answer about REST API design. "
-                    "Keep the explanation and correct answer concise (2-3 sentences each)."
-                )
-            elif self.current_question_mode == "fastapi":
-                user_prompt = (
-                    f"Question: {self.current_question}\n"
-                    f"User Answer: {user_answer}\n\n"
-                    "Evaluate this answer about FastAPI development. "
-                    "Keep the explanation and correct answer concise (2-3 sentences each)."
-                )
-            else:
-                user_prompt = (
-                    f"Context: {self.current_article_text}\n"
-                    f"Question: {self.current_question}\n"
-                    f"User Answer: {user_answer}\n\n"
-                )
+            user_prompt = (
+                f"Context: {self.current_article_text}\n"
+                f"Question: {self.current_question}\n"
+                f"User Answer: {user_answer}\n\n"
+            )
 
         try:
             # Use schema for Ollama, simple json for OpenAI
             if self.current_provider == "ollama":
                 schema = (
                     SystemDesignEvaluationResponse.model_json_schema()
-                    if is_system_design
+                    if use_score_eval
                     else EvaluationResponse.model_json_schema()
                 )
                 response_format: dict[str, Any] | str = dict(schema)
@@ -617,9 +592,9 @@ class CodeRecallApp(App):
                 response_format=response_format,
             )
 
-            if is_system_design:
+            if use_score_eval:
                 sd_evaluation = SystemDesignEvaluationResponse.model_validate_json(content)
-                self.call_from_thread(self.show_system_design_feedback, sd_evaluation)
+                self.call_from_thread(self.show_score_feedback, sd_evaluation)
             else:
                 evaluation = EvaluationResponse.model_validate_json(content)
                 self.call_from_thread(self.show_feedback, evaluation)
@@ -651,7 +626,7 @@ class CodeRecallApp(App):
         status_class = "pass" if evaluation.result.upper() == "PASS" else "fail"
         self._display_feedback(evaluation.result, status_class, evaluation.explanation, evaluation.answer)
 
-    def show_system_design_feedback(self, evaluation: SystemDesignEvaluationResponse) -> None:
+    def show_score_feedback(self, evaluation: SystemDesignEvaluationResponse) -> None:
         if evaluation.score >= 8:
             status_class = "score-high"
         elif evaluation.score >= 5:
