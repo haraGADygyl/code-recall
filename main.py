@@ -249,7 +249,7 @@ class CodeRecallApp(App):
     }
 
     .feedback-box {
-        height: auto;
+        height: 1fr;
         border-top: solid #444;
         padding: 1;
         background: #222;
