@@ -87,7 +87,7 @@ uv run pre-commit install --hook-type commit-msg
 
 ## 📝 Automation (Cron)
 
-To run CodeRecall every 2 hours and have it pop up a terminal window:
+To run CodeRecall every hour and have it pop up a terminal window:
 
 1.  Make sure `recall.sh` has the correct paths.
 2.  Open your crontab:
@@ -96,11 +96,11 @@ To run CodeRecall every 2 hours and have it pop up a terminal window:
     ```
 3.  Add the following line (update the path to the script):
     ```bash
-    0 */2 * * * /home/manushev/GitHub/python/code-recall/recall.sh
+    0 * * * * /home/manushev/GitHub/python/code-recall/recall.sh
     ```
 
 > [!NOTE]
-> The `recall.sh` script sets `DISPLAY`, `XAUTHORITY`, and `DBUS_SESSION_BUS_ADDRESS`. You may need to update these in the script to match your local session (e.g., `echo $DISPLAY`). The script will automatically try to read the model name from your `.env` file to handle VRAM cleanup.
+> The `recall.sh` script reads the active graphical session environment from the user systemd manager so Cron can open GNOME Terminal on the current desktop. If no graphical session is available, the script records the error in `recall_error.log`. It also reads the model name from `.env` for VRAM cleanup.
 
 ---
 Created by [Tihomir Manushev](https://github.com/haraGADygyl).
