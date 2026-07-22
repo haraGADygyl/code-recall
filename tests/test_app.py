@@ -4,7 +4,7 @@ from typing import cast
 from unittest.mock import patch
 
 import pytest
-from textual.widgets import Label, OptionList
+from textual.widgets import Button, Label, OptionList
 
 from code_recall.app import CodeRecallApp, StartupScreen
 from code_recall.config import Settings
@@ -75,6 +75,30 @@ async def test_arrow_and_enter_submit_correct_answer(make_settings: Callable[...
             assert answer_options.disabled
             assert str(status.render()) == "Correct"
             assert "[CORRECT]" in str(answer_options.options[1].prompt)
+            assert app.query_one("#btn-submit", Button).has_class("hidden")
+
+
+@pytest.mark.anyio
+async def test_submit_button_uses_highlighted_answer(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.pop_screen()
+            await pilot.pause()
+            app._generation_id = 1
+            app._show_question(1, make_session())
+            answer_options = app.query_one("#answer-options", OptionList)
+            answer_options.highlighted = 1
+
+            app.query_one("#btn-submit", Button).press()
+            await pilot.pause()
+
+            status = app.query_one("#feedback-status", Label)
+            assert app.answer_submitted
+            assert answer_options.disabled
+            assert str(status.render()) == "Correct"
+            assert "[CORRECT]" in str(answer_options.options[1].prompt)
 
 
 @pytest.mark.anyio
@@ -124,7 +148,28 @@ async def test_generation_error_exposes_retry(make_settings: Callable[..., Setti
             app._show_generation_error(1, "Provider unavailable")
 
             assert not app.query_one("#btn-next").has_class("hidden")
+            assert app.query_one("#btn-submit", Button).has_class("hidden")
             assert str(app.query_one("#source-label", Label).render()) == ""
+
+
+@pytest.mark.anyio
+async def test_new_session_restores_submit_button(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.pop_screen()
+            await pilot.pause()
+            app._generation_id = 1
+            app._show_question(1, make_session())
+            await pilot.press("enter")
+
+            app.load_new_session()
+            await pilot.pause()
+
+            submit_button = app.query_one("#btn-submit", Button)
+            assert not submit_button.has_class("hidden")
+            assert not submit_button.disabled
 
 
 @pytest.mark.anyio

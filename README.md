@@ -7,7 +7,7 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or lo
 - **TUI Power**: A sleek terminal interface built with [Textual](https://textual.textualize.io/).
 - **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+T`.
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
-- **Quick Recall**: Choose from four plausible answers and get an immediate explanation without typing.
+- **Quick Recall**: Choose from four plausible answers, then press `Enter` or click Submit for an immediate explanation.
 - **VRAM Optimized**: Ollama questions unload the configured model after generation by default.
 
 ## 🛠 Setup
@@ -79,7 +79,7 @@ uv run main.py
 ## ⚙️ How it Works
 
 1. **Generation**: The app selects an article or technical topic and asks the LLM for one question, one correct answer, three distractors, and a rationale.
-2. **Interaction**: Use the arrow keys to highlight an answer and press `Enter` to submit it.
+2. **Interaction**: Use the arrow keys to highlight an answer, then press `Enter` or click Submit.
 3. **Evaluation**: The app checks the selected answer locally and immediately shows the correct answer and rationale.
 4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The question's provider is shown below its answers.
 

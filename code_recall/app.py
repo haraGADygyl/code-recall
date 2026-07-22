@@ -216,6 +216,7 @@ class CodeRecallApp(App[None]):
                 yield Label("", id="source-label")
                 yield OptionList(id="answer-options", markup=False)
                 with Horizontal(id="button-bar"):
+                    yield Button("Submit", id="btn-submit", variant="primary")
                     yield Button("Next Question", id="btn-next", classes="hidden", variant="success")
                     yield Button("Quit", id="btn-quit", variant="error")
 
@@ -284,6 +285,9 @@ class CodeRecallApp(App[None]):
         answer_options = self.query_one("#answer-options", OptionList)
         answer_options.set_options([])
         answer_options.disabled = False
+        submit_button = self.query_one("#btn-submit", Button)
+        submit_button.disabled = False
+        submit_button.remove_class("hidden")
         self.query_one("#btn-next").add_class("hidden")
         self.query_one("#model-answer-label").add_class("hidden")
         self.query_one("#model-answer-content").add_class("hidden")
@@ -333,21 +337,33 @@ class CodeRecallApp(App[None]):
         self.query_one("#question-box", Static).update(f"Error: {error}")
         self.query_one("#source-label", Label).update("")
         self.query_one("#interaction-area").remove_class("hidden")
+        submit_button = self.query_one("#btn-submit", Button)
+        submit_button.disabled = True
+        submit_button.add_class("hidden")
         self.query_one("#btn-next").remove_class("hidden")
         self.query_one("#btn-next", Button).focus()
 
     @on(OptionList.OptionSelected, "#answer-options")
     def select_answer(self, event: OptionList.OptionSelected) -> None:
+        self._submit_answer(event.option_index, event.option_list)
+
+    @on(Button.Pressed, "#btn-submit")
+    def submit_answer(self) -> None:
+        answer_options = self.query_one("#answer-options", OptionList)
+        if answer_options.highlighted is None:
+            self.notify("Select an answer before submitting.", severity="warning")
+            return
+        self._submit_answer(answer_options.highlighted, answer_options)
+
+    def _submit_answer(self, selected_index: int, answer_options: OptionList) -> None:
         session = self.active_session
-        if self.answer_submitted or session is None or event.option_index >= len(session.answers):
+        if self.answer_submitted or session is None or not 0 <= selected_index < len(session.answers):
             return
 
         self.answer_submitted = True
-        selected_index = event.option_index
         selected_answer = session.answers[selected_index]
         is_correct = selected_index == session.correct_index
 
-        answer_options = event.option_list
         correct_answer = session.answers[session.correct_index]
         answer_options.replace_option_prompt_at_index(
             session.correct_index,
@@ -359,6 +375,9 @@ class CodeRecallApp(App[None]):
                 f"{chr(65 + selected_index)}. {selected_answer} [YOUR CHOICE]",
             )
         answer_options.disabled = True
+        submit_button = self.query_one("#btn-submit", Button)
+        submit_button.disabled = True
+        submit_button.add_class("hidden")
         self._display_feedback(session, selected_answer, is_correct)
 
     def _display_feedback(self, session: QuestionSession, selected_answer: str, is_correct: bool) -> None:
