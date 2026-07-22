@@ -32,7 +32,10 @@ class FakeProvider:
 @pytest.mark.anyio
 async def test_service_generates_immutable_session(make_settings: Callable[..., Settings]) -> None:
     settings = make_settings()
-    settings.SYSTEM_DESIGN_TOPICS_FILE.write_text('["Load balancing"]', encoding="utf-8")
+    settings.SYSTEM_DESIGN_TOPICS_FILE.write_text(
+        '{"Reliability": ["Load balancing"]}',
+        encoding="utf-8",
+    )
     provider = FakeProvider()
     service = QuestionService(
         ContentRepository(settings),
@@ -44,5 +47,6 @@ async def test_service_generates_immutable_session(make_settings: Callable[..., 
 
     assert session.answers[0] == "Distributes traffic across servers."
     assert session.correct_index == 0
-    assert session.source_title == "Load balancing"
+    assert session.source_title == "Reliability: Load balancing"
     assert "multiple-choice" in provider.messages[0]["content"]
+    assert "Reliability category" in provider.messages[1]["content"]

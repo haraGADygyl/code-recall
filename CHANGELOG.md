@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-07-21
+
+### Added
+
+- Categorized system-design catalog with 88 senior-level topics across 11 balanced categories
+- Category-first random selection and validation for duplicate, empty, or malformed topic groups
+
+### Changed
+
+- Topic loading now supports both categorized catalogs and the existing flat REST API and FastAPI lists
+
 ## [0.1.7] - 2026-07-21
 
 ### Added

@@ -41,7 +41,7 @@ uv run main.py
 ### Application Flow
 
 1. StartupScreen prepares the selected provider and validates the selected source mode
-2. Random article or technical topic selected → LLM generates a question, four answers, and rationale
+2. Random article or technical topic selected → LLM generates a question, four answers, and rationale; system-design topics are selected category-first from a balanced catalog
 3. User selects an answer and presses Enter or clicks Submit → app evaluates it locally and displays the rationale
 4. Ollama unloads the configured model after generation unless `OLLAMA_KEEP_ALIVE` overrides the default
 

@@ -87,6 +87,7 @@ class SourceMaterial:
     mode: QuestionMode
     title: str
     content: str
+    category: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

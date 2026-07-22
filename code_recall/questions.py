@@ -52,9 +52,10 @@ class QuestionService:
                 f"content.\n\n<article>\n{source.content}\n</article>"
             )
         else:
+            category = f" in the {source.category} category" if source.category else ""
             user_prompt = (
                 f"Generate one concise conceptual multiple-choice question about this "
-                f"{MODE_LABELS[source.mode]} topic: {source.content}."
+                f"{MODE_LABELS[source.mode]} topic{category}: {source.content}."
             )
         return [
             {"role": "system", "content": system_prompt},
