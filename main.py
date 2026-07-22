@@ -3,11 +3,11 @@ import logging
 import random
 import subprocess
 import time
-from typing import Any
+from typing import Any, Self, TypeVar, cast
 
 import ollama
 from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from rich.markdown import Markdown
 from textual import on, work
 from textual.app import App, ComposeResult
@@ -20,8 +20,8 @@ from textual.widgets import (
     Footer,
     Label,
     LoadingIndicator,
+    OptionList,
     Static,
-    TextArea,
 )
 
 from settings import settings
@@ -29,29 +29,41 @@ from settings import settings
 logging.basicConfig(filename="debug.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-class EvaluationResponse(BaseModel):
-    result: str = Field(..., description="PASS or FAIL")
-    explanation: str = Field(..., description="A concise explanation of why it passed or failed.")
-    answer: str = Field(
-        ...,
-        description="The correct answer to the question, independent of the user's response.",
-    )
-
-
-class SystemDesignEvaluationResponse(BaseModel):
-    score: int = Field(..., ge=1, le=10, description="Score from 1 to 10")
+class MultipleChoiceQuestion(BaseModel):
+    question: str = Field(..., description="A concise technical question")
+    correct_answer: str = Field(..., description="The single correct answer")
+    distractors: list[str] = Field(..., min_length=3, max_length=3, description="Three plausible wrong answers")
     explanation: str = Field(
         ...,
-        description="Detailed explanation of the score covering scalability, "
-        "trade-offs, component choices, and bottleneck awareness.",
-    )
-    answer: str = Field(
-        ...,
-        description="A comprehensive reference answer to the system design question.",
+        description="A concise explanation of why the correct answer is correct",
     )
 
+    @model_validator(mode="after")
+    def validate_content(self) -> Self:
+        """Normalize generated content and require four distinct answers."""
+        self.question = self.question.strip()
+        self.correct_answer = self.correct_answer.strip()
+        self.distractors = [answer.strip() for answer in self.distractors]
+        self.explanation = self.explanation.strip()
 
-class StartupScreen(Screen):
+        if not self.question or not self.explanation or any(not answer for answer in self.all_answers):
+            raise ValueError("Question, answers, and explanation must not be blank")
+
+        normalized_answers = [answer.casefold() for answer in self.all_answers]
+        if len(set(normalized_answers)) != 4:
+            raise ValueError("The correct answer and distractors must be unique")
+
+        return self
+
+    @property
+    def all_answers(self) -> list[str]:
+        return [self.correct_answer, *self.distractors]
+
+
+ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
+
+
+class StartupScreen(Screen[None]):
     """Screen for checking dependencies."""
 
     status_message = reactive("Initializing...")
@@ -145,7 +157,7 @@ class StartupScreen(Screen):
     def finish_startup(self) -> None:
         logging.info("Startup: Finishing startup sequence...")
         self.app.pop_screen()
-        self.app.load_new_session()
+        cast("CodeRecallApp", self.app).load_new_session()
 
     def update_status(self, msg: str) -> None:
         self.status_message = msg
@@ -159,7 +171,7 @@ class StartupScreen(Screen):
         logging.error(f"Startup failed: {msg}")
 
 
-class CodeRecallApp(App):
+class CodeRecallApp(App[None]):
     CSS = """
     Screen {
         align: center middle;
@@ -218,33 +230,19 @@ class CodeRecallApp(App):
         margin-bottom: 1;
     }
 
-    .pass {
+    .correct {
         color: #00ff00;
         text-style: bold;
     }
 
-    .fail {
+    .incorrect {
         color: #ff0000;
         text-style: bold;
     }
 
-    .score-high {
-        color: #00ff00;
-        text-style: bold;
-    }
-
-    .score-mid {
-        color: #ffaa00;
-        text-style: bold;
-    }
-
-    .score-low {
-        color: #ff0000;
-        text-style: bold;
-    }
-
-    TextArea {
+    #answer-options {
         height: auto;
+        max-height: 12;
         border: solid #555;
     }
 
@@ -278,7 +276,6 @@ class CodeRecallApp(App):
 
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),
-        ("ctrl+s", "submit_answer", "Submit"),
         ("ctrl+n", "next_question", "Next"),
         ("ctrl+t", "toggle_provider", "Toggle Provider"),
         ("ctrl+r", "toggle_question_mode", "Toggle Mode"),
@@ -300,6 +297,12 @@ class CodeRecallApp(App):
     current_article_text: str = ""
     current_article_title: str = ""
     current_question: str = ""
+    current_answers: list[str] = []
+    current_correct_index: int = -1
+    current_explanation: str = ""
+    answer_submitted: bool = False
+    question_provider: str = settings.DEFAULT_PROVIDER
+    question_mode: str = settings.DEFAULT_QUESTION_MODE
     current_provider: reactive[str] = reactive(settings.DEFAULT_PROVIDER)
     current_question_mode: reactive[str] = reactive(settings.DEFAULT_QUESTION_MODE)
     ollama_verified: bool = False
@@ -315,16 +318,15 @@ class CodeRecallApp(App):
             with Vertical(id="interaction-area", classes="hidden"):
                 yield Static("", id="question-box")
                 yield Label("", id="source-label")
-                yield TextArea(id="answer-input", show_line_numbers=False)
+                yield OptionList(id="answer-options", markup=False)
                 with Horizontal(id="button-bar"):
-                    yield Button("Submit", id="btn-submit", variant="primary")
                     yield Button("Next Question", id="btn-next", classes="hidden", variant="success")
                     yield Button("Quit", id="btn-quit", variant="error")
 
             with Vertical(id="feedback-container", classes="hidden feedback-box"):
                 yield Label("", id="feedback-status")
                 yield Static("", id="feedback-content")
-                yield Label("Expected Answer:", id="model-answer-label", classes="hidden")
+                yield Label("Correct Answer:", id="model-answer-label", classes="hidden")
                 yield Static("", id="model-answer-content", classes="hidden")
 
         yield Footer()
@@ -342,9 +344,9 @@ class CodeRecallApp(App):
 
     def update_provider_display(self) -> None:
         """Update the provider status in the source label."""
-        provider_name = "OpenAI" if self.current_provider == "openai" else "Ollama"
-        model_name = settings.OPENAI_MODEL_NAME if self.current_provider == "openai" else settings.MODEL_NAME
-        mode_label = self.MODE_LABELS.get(self.current_question_mode, self.current_article_title)
+        provider_name = "OpenAI" if self.question_provider == "openai" else "Ollama"
+        model_name = settings.OPENAI_MODEL_NAME if self.question_provider == "openai" else settings.MODEL_NAME
+        mode_label = self.MODE_LABELS.get(self.question_mode, self.current_article_title)
         try:
             source_label = self.query_one("#source-label", Label)
             source_label.update(f"Source: {mode_label}  |  Provider: {provider_name}  |  Model: {model_name}")
@@ -407,35 +409,44 @@ class CodeRecallApp(App):
         self.update_provider_display()
         self.notify("Switched to Ollama", severity="information")
 
-    def llm_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | str | None = None) -> str:
-        """Route chat request to the current provider."""
-        if self.current_provider == "openai":
-            return self._openai_chat(messages, response_format)
-        else:
-            return self._ollama_chat(messages, response_format)
+    def llm_chat(
+        self,
+        messages: list[dict[str, str]],
+        response_model: type[ResponseModel],
+        provider: str | None = None,
+    ) -> ResponseModel:
+        """Request and validate a structured response from the current provider."""
+        selected_provider = provider or self.current_provider
+        if selected_provider == "openai":
+            return self._openai_chat(messages, response_model)
+        return self._ollama_chat(messages, response_model)
 
-    def _openai_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | str | None = None) -> str:
-        """Send chat request to OpenAI."""
+    def _openai_chat(self, messages: list[dict[str, str]], response_model: type[ResponseModel]) -> ResponseModel:
+        """Request a parsed structured response from OpenAI."""
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         kwargs: dict[str, Any] = {
             "model": settings.OPENAI_MODEL_NAME,
             "messages": messages,
+            "response_format": response_model,
         }
-        if response_format:
-            kwargs["response_format"] = {"type": "json_object"}
-        response = client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content or ""
+        response = client.chat.completions.parse(**kwargs)
+        message = response.choices[0].message
+        parsed: ResponseModel | None = message.parsed
+        if parsed is not None:
+            return parsed
+        if message.refusal:
+            raise ValueError(f"OpenAI refused the question request: {message.refusal}")
+        raise ValueError("OpenAI returned no structured question")
 
-    def _ollama_chat(self, messages: list[dict[str, str]], response_format: dict[str, Any] | str | None = None) -> str:
-        """Send chat request to Ollama."""
+    def _ollama_chat(self, messages: list[dict[str, str]], response_model: type[ResponseModel]) -> ResponseModel:
+        """Request and validate a structured response from Ollama."""
         kwargs: dict[str, Any] = {
             "model": settings.MODEL_NAME,
             "messages": messages,
+            "format": response_model.model_json_schema(),
         }
-        if response_format:
-            kwargs["format"] = response_format
         response = ollama.chat(**kwargs)
-        return str(response["message"]["content"])
+        return response_model.model_validate_json(str(response["message"]["content"]))
 
     def on_startup_complete(self, message: StartupComplete) -> None:
         self.pop_screen()
@@ -443,197 +454,166 @@ class CodeRecallApp(App):
 
     def load_new_session(self) -> None:
         """Pick a random article and start generation."""
+        question_mode = self.current_question_mode
+        question_provider = self.current_provider
+
         # Reset UI
+        self.answer_submitted = False
+        self.current_answers = []
+        self.current_correct_index = -1
+        self.current_explanation = ""
         self.query_one("#interaction-area").add_class("hidden")
         self.query_one("#feedback-container").add_class("hidden")
         self.query_one("#question-box", Static).update("Generating question...")
         self.query_one("#main-status", Label).remove_class("hidden")
-        self.query_one("#answer-input", TextArea).text = ""
-        self.query_one("#btn-submit").remove_class("hidden")
+        answer_options = self.query_one("#answer-options", OptionList)
+        answer_options.set_options([])
+        answer_options.disabled = False
         self.query_one("#btn-next").add_class("hidden")
+        self.query_one("#model-answer-label").add_class("hidden")
+        self.query_one("#model-answer-content").add_class("hidden")
 
-        if self.current_question_mode == "articles":
+        if question_mode == "articles":
             self.query_one("#main-status", Label).update("Selecting article and generating question...")
             files = list(settings.ARTICLES_DIR.glob("*.md"))
             if not files:
                 self.notify("No articles found", severity="error")
+                self.show_generation_error("No articles found")
                 return
             selected_file = random.choice(files)
             self.current_article_title = selected_file.name
             self.current_article_text = selected_file.read_text(encoding="utf-8")
         else:
-            label = self.MODE_LABELS[self.current_question_mode]
+            label = self.MODE_LABELS[question_mode]
             self.query_one("#main-status", Label).update(f"Generating {label} question...")
             self.current_article_title = label
             self.current_article_text = ""
 
-        self.generate_question()
+        self.generate_question(question_mode, question_provider, self.current_article_text)
 
     @work(thread=True)
-    def generate_question(self) -> None:
-        topic_file_attr = self.TOPIC_FILES.get(self.current_question_mode)
-        if topic_file_attr:
-            topics_file = getattr(settings, topic_file_attr)
-            topics = json.loads(topics_file.read_text(encoding="utf-8"))
-            topic = random.choice(topics)
-            mode_label = self.MODE_LABELS[self.current_question_mode]
-            user_prompt = (
-                f"Generate a single short conceptual question about the following {mode_label} topic: {topic}. "
-                "Keep the question brief (1-2 sentences). "
-                "The expected answer should be concise (2-3 sentences max). "
-                "Do not ask for code. "
-                'Return JSON format: {"question": "..."}'
-            )
-        else:
-            user_prompt = (
-                f"Read the following text:\n\n{self.current_article_text}\n\n"
-                "Ask a single conceptual Python3 question based on this text to test understanding. "
-                "Never ask for code examples or implementation details."
-                'Return JSON format: {"question": "..."}'
-            )
-
+    def generate_question(self, question_mode: str, question_provider: str, article_text: str) -> None:
         try:
-            response_text = self.llm_chat(
-                messages=[{"role": "user", "content": user_prompt}],
-                response_format="json",
+            topic_file_attr = self.TOPIC_FILES.get(question_mode)
+            if topic_file_attr:
+                topics_file = getattr(settings, topic_file_attr)
+                topics = json.loads(topics_file.read_text(encoding="utf-8"))
+                topic = random.choice(topics)
+                mode_label = self.MODE_LABELS[question_mode]
+                user_prompt = (
+                    f"Generate one concise conceptual multiple-choice question about this {mode_label} topic: {topic}."
+                )
+            else:
+                user_prompt = (
+                    f"Read the following text:\n\n{article_text}\n\n"
+                    "Generate one concise conceptual Python 3 multiple-choice question based only on this text."
+                )
+
+            question = self.llm_chat(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You create technical multiple-choice questions. Each question must have one "
+                            "unambiguously correct answer and exactly three plausible but incorrect distractors. "
+                            "Keep the question brief, avoid code-writing tasks and trick questions, and never use "
+                            "'all of the above' or 'none of the above'. Keep all answers similar in length and style. "
+                            "Explain briefly why the correct answer is correct."
+                        ),
+                    },
+                    {"role": "user", "content": user_prompt},
+                ],
+                response_model=MultipleChoiceQuestion,
+                provider=question_provider,
             )
-            data = json.loads(response_text)
-            self.current_question = data.get("question", "Failed to parse question.")
+            answers = question.all_answers
+            random.shuffle(answers)
+
+            self.current_question = question.question
+            self.current_answers = answers
+            self.current_correct_index = answers.index(question.correct_answer)
+            self.current_explanation = question.explanation
+            self.question_mode = question_mode
+            self.question_provider = question_provider
 
             # Update UI
             self.call_from_thread(self.show_question)
 
         except Exception as e:
             logging.error(f"Generation error: {e}")
-            self.call_from_thread(lambda ex=e: self.query_one("#question-box", Static).update(f"Error: {ex}"))
+            self.call_from_thread(self.show_generation_error, str(e))
 
     def show_question(self) -> None:
         self.query_one("#main-status", Label).add_class("hidden")
         q_box = self.query_one("#question-box", Static)
         q_box.update(Markdown(f"**Question:**\n{self.current_question}"))
+        answer_options = self.query_one("#answer-options", OptionList)
+        answer_options.set_options(
+            [f"{chr(65 + index)}. {answer}" for index, answer in enumerate(self.current_answers)]
+        )
+        answer_options.highlighted = 0
         self.update_provider_display()
 
         self.query_one("#interaction-area").remove_class("hidden")
-        self.query_one("#answer-input", TextArea).focus()
+        answer_options.focus()
 
-    @on(Button.Pressed, "#btn-submit")
-    def action_submit_answer(self) -> None:
-        # Check if button is visible/active to prevent double submit or invalid state
-        if self.query_one("#btn-submit").has_class("hidden"):
+    def show_generation_error(self, error: str) -> None:
+        self.query_one("#main-status", Label).update("Question generation failed")
+        self.query_one("#question-box", Static).update(f"Error: {error}")
+        self.query_one("#interaction-area").remove_class("hidden")
+        self.query_one("#btn-next").remove_class("hidden")
+        self.query_one("#btn-next").focus()
+
+    @on(OptionList.OptionSelected, "#answer-options")
+    def select_answer(self, event: OptionList.OptionSelected) -> None:
+        if self.answer_submitted or event.option_index >= len(self.current_answers):
             return
 
-        user_answer = self.query_one("#answer-input", TextArea).text
-        if not user_answer.strip():
-            return
+        self.answer_submitted = True
+        answer_options = event.option_list
+        selected_index = event.option_index
+        selected_answer = self.current_answers[selected_index]
+        is_correct = selected_index == self.current_correct_index
 
-        self.query_one("#btn-submit").add_class("hidden")
-        self.query_one("#main-status", Label).remove_class("hidden")
-        self.query_one("#main-status", Label).update("Evaluating answer...")
-
-        self.evaluate_answer(user_answer)
-
-    @work(thread=True)
-    def evaluate_answer(self, user_answer: str) -> None:
-        use_score_eval = self.current_question_mode in self.TOPIC_FILES
-
-        if use_score_eval:
-            mode_label = self.MODE_LABELS[self.current_question_mode]
-            sys_prompt = (
-                "You are a strict technical interviewer. "
-                "Score the user's answer on a scale of 1 to 10.\n"
-                "Evaluate based on these criteria:\n"
-                "- Correctness: Is the answer technically accurate?\n"
-                "- Depth: Does the answer demonstrate thorough understanding?\n"
-                "- Practical awareness: Does the answer consider real-world trade-offs?\n"
-                "Your output must be a valid JSON object with three fields:\n"
-                "1. 'score': An integer from 1 to 10\n"
-                "2. 'explanation': A detailed explanation of the score.\n"
-                "3. 'answer': A comprehensive reference answer to the question."
+        correct_marker = " [CORRECT]"
+        correct_answer = self.current_answers[self.current_correct_index]
+        answer_options.replace_option_prompt_at_index(
+            self.current_correct_index,
+            f"{chr(65 + self.current_correct_index)}. {correct_answer}{correct_marker}",
+        )
+        if not is_correct:
+            answer_options.replace_option_prompt_at_index(
+                selected_index,
+                f"{chr(65 + selected_index)}. {selected_answer} [YOUR CHOICE]",
             )
-            user_prompt = (
-                f"Question: {self.current_question}\n"
-                f"User Answer: {user_answer}\n\n"
-                f"Score this {mode_label} answer from 1 to 10. "
-                "A score of 1-3 means major gaps in understanding. "
-                "A score of 4-6 means partial understanding with notable omissions. "
-                "A score of 7-8 means solid understanding with minor gaps. "
-                "A score of 9-10 means exceptional, comprehensive answer."
-            )
-        else:
-            sys_prompt = (
-                "You are a strict technical interviewer. Evaluate the user's answer.\n"
-                "Your output must be a valid JSON object with three fields:\n"
-                "1. 'result': 'PASS' or 'FAIL'\n"
-                "2. 'explanation': A concise explanation of why it passed or failed.\n"
-                "3. 'answer': The correct answer to the question, independent of the user's response."
-            )
-            user_prompt = (
-                f"Context: {self.current_article_text}\n"
-                f"Question: {self.current_question}\n"
-                f"User Answer: {user_answer}\n\n"
-            )
+        answer_options.disabled = True
 
-        try:
-            # Use schema for Ollama, simple json for OpenAI
-            if self.current_provider == "ollama":
-                schema = (
-                    SystemDesignEvaluationResponse.model_json_schema()
-                    if use_score_eval
-                    else EvaluationResponse.model_json_schema()
-                )
-                response_format: dict[str, Any] | str = dict(schema)
-            else:
-                response_format = "json"
-            content = self.llm_chat(
-                messages=[
-                    {"role": "system", "content": sys_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                response_format=response_format,
-            )
+        self._display_feedback(
+            status_text="Correct" if is_correct else "Incorrect",
+            status_class="correct" if is_correct else "incorrect",
+            selected_answer=selected_answer,
+        )
 
-            if use_score_eval:
-                sd_evaluation = SystemDesignEvaluationResponse.model_validate_json(content)
-                self.call_from_thread(self.show_score_feedback, sd_evaluation)
-            else:
-                evaluation = EvaluationResponse.model_validate_json(content)
-                self.call_from_thread(self.show_feedback, evaluation)
-
-        except Exception as e:
-            logging.error(f"Evaluation error: {e}")
-            self.call_from_thread(lambda ex=e: self.query_one("#feedback-content", Static).update(f"Error: {ex}"))
-
-    def _display_feedback(self, status_text: str, status_class: str, explanation: str, answer: str) -> None:
+    def _display_feedback(self, status_text: str, status_class: str, selected_answer: str) -> None:
         self.query_one("#main-status", Label).add_class("hidden")
 
         status_lbl = self.query_one("#feedback-status", Label)
         status_lbl.update(status_text)
-        status_lbl.remove_class("pass", "fail", "score-high", "score-mid", "score-low")
+        status_lbl.remove_class("correct", "incorrect")
         status_lbl.add_class(status_class)
 
-        self.query_one("#feedback-content", Static).update(Markdown(explanation))
+        self.query_one("#feedback-content", Static).update(
+            Markdown(f"**Your answer:** {selected_answer}\n\n{self.current_explanation}")
+        )
 
         self.query_one("#model-answer-label").remove_class("hidden")
         ans_content = self.query_one("#model-answer-content", Static)
         ans_content.remove_class("hidden")
-        ans_content.update(Markdown(answer))
+        ans_content.update(Markdown(self.current_answers[self.current_correct_index]))
 
         self.query_one("#feedback-container").remove_class("hidden")
         self.query_one("#btn-next").remove_class("hidden")
         self.query_one("#btn-next").focus()
-
-    def show_feedback(self, evaluation: EvaluationResponse) -> None:
-        status_class = "pass" if evaluation.result.upper() == "PASS" else "fail"
-        self._display_feedback(evaluation.result, status_class, evaluation.explanation, evaluation.answer)
-
-    def show_score_feedback(self, evaluation: SystemDesignEvaluationResponse) -> None:
-        if evaluation.score >= 8:
-            status_class = "score-high"
-        elif evaluation.score >= 5:
-            status_class = "score-mid"
-        else:
-            status_class = "score-low"
-        self._display_feedback(f"Score: {evaluation.score}/10", status_class, evaluation.explanation, evaluation.answer)
 
     @on(Button.Pressed, "#btn-next")
     def action_next_question(self) -> None:

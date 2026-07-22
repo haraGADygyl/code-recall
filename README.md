@@ -1,6 +1,6 @@
 # 🧠 CodeRecall
 
-CodeRecall is a lightweight, terminal-based flashcard app that uses local LLMs to help you retain knowledge from your markdown articles. No databases, no cloud, just you and your notes.
+CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or local LLMs to create multiple-choice questions from technical topics and markdown articles.
 
 ![Startup](screenshots/00.png)
 *Main interface with a question.*
@@ -11,10 +11,10 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses local LLMs t
 ## 🚀 Features
 
 - **TUI Power**: A sleek terminal interface built with [Textual](https://textual.textualize.io/).
-- **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+M`.
+- **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+T`.
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
-- **Deep Recall**: Not just multiple choice—type your answers and get strict technical feedback.
-- **VRAM Optimized**: Explicitly unloads models on exit to keep your GPU ready for other tasks.
+- **Quick Recall**: Choose from four plausible answers and get an immediate explanation without typing.
+- **VRAM Optimized**: The Cron launcher unloads the configured Ollama model after the app exits.
 
 ## 🛠 Setup
 
@@ -59,17 +59,19 @@ uv run main.py
 ### Keyboard Shortcuts
 | Key | Action |
 |-----|--------|
-| `Ctrl+S` | Submit Answer |
+| `Up` / `Down` | Select Answer |
+| `Enter` | Submit Answer |
 | `Ctrl+N` | Next Question |
 | `Ctrl+T` | Toggle Provider |
+| `Ctrl+R` | Toggle Question Mode |
 | `Ctrl+Q` | Quit Application |
 
 ## ⚙️ How it Works
 
-1. **Generation**: The app picks a random markdown file and asks the LLM (OpenAI or Ollama) to generate a conceptual question.
-2. **Interaction**: You type your answer in the provided text area.
-3. **Evaluation**: The LLM acts as a "Strict Technical Interviewer," grading your response as **PASS** or **FAIL** with feedback on missing concepts.
-4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The current provider is shown in the footer.
+1. **Generation**: The app selects an article or technical topic and asks the LLM for one question, one correct answer, three distractors, and a rationale.
+2. **Interaction**: Use the arrow keys to highlight an answer and press `Enter` to submit it.
+3. **Evaluation**: The app checks the selected answer locally and immediately shows the correct answer and rationale.
+4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The question's provider is shown below its answers.
 
 ## 💬 Commit Convention
 

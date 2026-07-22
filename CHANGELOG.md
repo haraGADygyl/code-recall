@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-21
+
+### Added
+
+- Four-answer multiple-choice questions with keyboard navigation and Enter submission
+- Structured question generation and validation for OpenAI and Ollama
+- Immediate local evaluation with the correct answer and rationale
+
+### Changed
+
+- Replaced free-text answers and the second LLM evaluation request with a single multiple-choice generation request
+
 ## [0.1.4] - 2026-02-21
 
 ### Added

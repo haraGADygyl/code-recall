@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CodeRecall is a terminal-based flashcard application that uses local LLMs (via Ollama) to generate questions from markdown articles and evaluate user answers. Built with Textual for the TUI and Pydantic for configuration.
+CodeRecall is a terminal-based flashcard application that uses OpenAI or local LLMs (via Ollama) to generate multiple-choice questions from markdown articles and technical topics. Built with Textual for the TUI and Pydantic for configuration.
 
 ## Commands
 
@@ -19,7 +19,7 @@ uv run main.py
 ./recall.sh
 ```
 
-**Prerequisites:** Ollama must be installed and running. The app will auto-pull the `gemma2:2b` model if not present.
+**Prerequisites:** Configure an OpenAI API key or install Ollama, depending on the selected provider. The app auto-pulls the configured Ollama model when Ollama is the default provider.
 
 ## Architecture
 
@@ -27,32 +27,37 @@ uv run main.py
 
 - **`main.py`** - Application entry point containing:
   - `StartupScreen` - Handles initialization, Ollama service/model checks
-  - `CodeRecallApp` - Main Textual app with question generation, answer evaluation, and UI
-  - `EvaluationResponse` - Pydantic model for structured LLM evaluation output
+  - `CodeRecallApp` - Main Textual app with structured question generation, local answer evaluation, and UI
+  - `MultipleChoiceQuestion` - Pydantic model for structured question output
 
 - **`settings.py`** - Pydantic BaseSettings for environment configuration (`MODEL_NAME`, `ARTICLES_DIR`)
 
-- **`recall.sh`** - Cron automation script that sets up GUI environment variables and launches the app in a terminal window
+- **`recall.sh`** - Cron automation script that imports the active GUI environment and launches the app in a terminal window
 
 ### Application Flow
 
-1. StartupScreen verifies Ollama service → checks model availability → validates articles directory
-2. Random markdown article selected → LLM generates conceptual question (JSON format)
-3. User types answer in TUI → LLM evaluates as PASS/FAIL with explanation
-4. On exit, model is explicitly unloaded to free VRAM
+1. StartupScreen checks the selected provider and validates the articles directory when required
+2. Random article or technical topic selected → LLM generates a question, four answers, and rationale
+3. User selects an answer in the TUI → app evaluates it locally and displays the rationale
+4. When launched through `recall.sh`, the configured Ollama model is unloaded after exit
 
 ### Key Bindings
 
 - `Ctrl+Q` - Quit
-- `Ctrl+S` - Submit Answer
+- `Up` / `Down` - Select Answer
+- `Enter` - Submit Answer
 - `Ctrl+N` - Next Question
+- `Ctrl+T` - Toggle Provider
+- `Ctrl+R` - Toggle Question Mode
 
 ## Configuration
 
 Environment variables in `.env` (see `.env.example`):
 - `ARTICLES_DIR` - Directory containing markdown articles (default: `./articles`)
 - `MODEL_NAME` - Ollama model to use (default: `gemma2:2b`)
-- `DISPLAY`, `XAUTHORITY`, `DBUS_SESSION_BUS_ADDRESS` - For cron GUI integration
+- `OPENAI_API_KEY`, `OPENAI_MODEL_NAME` - OpenAI credentials and model
+- `DEFAULT_PROVIDER` - Initial provider (`openai` or `ollama`)
+- `DEFAULT_QUESTION_MODE` - Initial article or technical-topic mode
 
 ## Changelog
 
