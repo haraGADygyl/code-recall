@@ -12,6 +12,9 @@ CodeRecall is a terminal-based flashcard application that uses OpenAI or local L
 # Install dependencies
 uv sync
 
+# Install development dependencies
+uv sync --extra dev
+
 # Run the application
 uv run main.py
 
@@ -25,21 +28,22 @@ uv run main.py
 
 ### Main Components
 
-- **`main.py`** - Application entry point containing:
-  - `StartupScreen` - Handles initialization, Ollama service/model checks
-  - `CodeRecallApp` - Main Textual app with structured question generation, local answer evaluation, and UI
-  - `MultipleChoiceQuestion` - Pydantic model for structured question output
-
-- **`settings.py`** - Pydantic BaseSettings for environment configuration (`MODEL_NAME`, `ARTICLES_DIR`)
+- **`main.py`** - Composition root for settings, logging, providers, and the Textual app
+- **`code_recall/app.py`** - Textual UI with exclusive, cancellation-safe async workers
+- **`code_recall/config.py`** - Pydantic settings and anchored application paths
+- **`code_recall/content.py`** - Safe article and typed topic loading
+- **`code_recall/domain.py`** - Provider/mode enums and immutable question models
+- **`code_recall/providers.py`** - OpenAI and Ollama adapters with explicit timeouts
+- **`code_recall/questions.py`** - Prompt construction and question orchestration
 
 - **`recall.sh`** - Cron automation script that imports the active GUI environment and launches the app in a terminal window
 
 ### Application Flow
 
-1. StartupScreen checks the selected provider and validates the articles directory when required
+1. StartupScreen prepares the selected provider and validates the selected source mode
 2. Random article or technical topic selected → LLM generates a question, four answers, and rationale
 3. User selects an answer in the TUI → app evaluates it locally and displays the rationale
-4. When launched through `recall.sh`, the configured Ollama model is unloaded after exit
+4. Ollama unloads the configured model after generation unless `OLLAMA_KEEP_ALIVE` overrides the default
 
 ### Key Bindings
 
@@ -58,6 +62,8 @@ Environment variables in `.env` (see `.env.example`):
 - `OPENAI_API_KEY`, `OPENAI_MODEL_NAME` - OpenAI credentials and model
 - `DEFAULT_PROVIDER` - Initial provider (`openai` or `ollama`)
 - `DEFAULT_QUESTION_MODE` - Initial article or technical-topic mode
+- `ALLOW_REMOTE_ARTICLES` - Required opt-in for sending article contents to OpenAI
+- `MAX_ARTICLE_BYTES` - Maximum article size accepted for generation
 
 ## Changelog
 

@@ -18,6 +18,3 @@ recall_error.log
 .env.*
 !.env.example
 
-# Lock files
-uv.lock
-

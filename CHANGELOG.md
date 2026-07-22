@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-07-21
+
+### Added
+
+- Modular `code_recall` package separating UI, configuration, content, providers, and question orchestration
+- Explicit opt-in and file-safety limits for sending article contents to OpenAI
+- Request timeouts, bounded OpenAI retries, typed provider errors, and Ollama keep-alive configuration
+- Single-instance Cron locking, private XDG logs, tracked dependency lockfile, and CI checks
+- Hermetic tests for settings, content safety, providers, UI recovery, stale workers, and the launcher
+
+### Changed
+
+- Textual workers now deliver immutable results on the main thread and reject cancelled or stale results
+- Settings are constructed at startup instead of module import, and bundled paths are anchored to the project
+- Application logs now rotate under the private user state directory
+
+### Fixed
+
+- Cron now preserves the application exit status and no longer stops an unrelated or malformed Ollama model name
+- Topic files and articles now produce actionable validation errors instead of leaving the UI stuck
+
 ## [0.1.5] - 2026-07-21
 
 ### Added

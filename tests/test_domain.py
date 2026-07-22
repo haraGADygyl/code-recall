@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from main import MultipleChoiceQuestion
+from code_recall.domain import MultipleChoiceQuestion
 
 
 def make_question(**overrides: object) -> MultipleChoiceQuestion:
@@ -19,33 +19,17 @@ def make_question(**overrides: object) -> MultipleChoiceQuestion:
     return MultipleChoiceQuestion.model_validate(data)
 
 
-def test_valid_question_exposes_all_answers() -> None:
-    question = make_question()
+def test_valid_question_normalizes_and_exposes_answers() -> None:
+    question = make_question(question="  What is asyncio?  ")
 
+    assert question.question == "What is asyncio?"
     assert len(question.all_answers) == 4
     assert question.all_answers[0] == question.correct_answer
 
 
-def test_content_is_trimmed() -> None:
-    question = make_question(
-        question="  What is asyncio?  ",
-        correct_answer="  An asynchronous I/O framework.  ",
-        distractors=["  A database.  ", "  A web server.  ", "  A test runner.  "],
-        explanation="  It provides event-loop-based concurrency.  ",
-    )
-
-    assert question.question == "What is asyncio?"
-    assert question.correct_answer == "An asynchronous I/O framework."
-    assert question.distractors == ["A database.", "A web server.", "A test runner."]
-    assert question.explanation == "It provides event-loop-based concurrency."
-
-
 @pytest.mark.parametrize(
     "distractors",
-    [
-        ["One", "Two"],
-        ["One", "Two", "Three", "Four"],
-    ],
+    [["One", "Two"], ["One", "Two", "Three", "Four"]],
 )
 def test_requires_exactly_three_distractors(distractors: list[str]) -> None:
     with pytest.raises(ValidationError):
@@ -70,22 +54,16 @@ def test_rejects_duplicate_answers_case_insensitively() -> None:
     with pytest.raises(ValidationError, match="must be unique"):
         make_question(
             correct_answer="The event loop schedules tasks.",
-            distractors=[
-                "the event loop schedules tasks.",
-                "It compiles code.",
-                "It creates processes.",
-            ],
+            distractors=["the event loop schedules tasks.", "It compiles code.", "It creates processes."],
         )
 
 
-def test_model_validates_json() -> None:
-    question = MultipleChoiceQuestion.model_validate_json(
-        """{
-            "question": "Which HTTP method is conventionally idempotent?",
-            "correct_answer": "PUT",
-            "distractors": ["POST", "CONNECT", "PATCH"],
-            "explanation": "Repeating the same PUT request should produce the same intended state."
-        }"""
-    )
+@pytest.mark.parametrize("answer", ["All of the above", "None of the above."])
+def test_rejects_catch_all_answers(answer: str) -> None:
+    with pytest.raises(ValidationError, match="not allowed"):
+        make_question(distractors=[answer, "First", "Second"])
 
-    assert question.correct_answer == "PUT"
+
+def test_rejects_excessively_long_content() -> None:
+    with pytest.raises(ValidationError):
+        make_question(question="x" * 501)

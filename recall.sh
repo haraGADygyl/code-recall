@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Configuration
-# Automatically detect the project directory relative to this script
+umask 077
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR" || exit 1
 
 # Load the optional extra PATH if .env exists
-if [ -f .env ]; then
+if [ -z "${EXTRA_PATH:-}" ] && [ -f .env ]; then
     # Avoid sourcing .env because it may contain values that are not shell-safe.
     EXTRA_PATH=$(grep -m1 '^EXTRA_PATH=' .env | cut -d'=' -f2- | tr -d '"')
 fi
@@ -14,16 +14,38 @@ fi
 # Set up PATH - includes user local bin and any extra paths from .env
 export PATH="${EXTRA_PATH:+$EXTRA_PATH:}$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/code-recall"
+mkdir -p -m 700 "$STATE_DIR" || exit 1
+chmod 700 "$STATE_DIR"
+LOG_FILE="$STATE_DIR/recall-error.log"
+LOCK_FILE="$STATE_DIR/recall.lock"
+
+log_error() {
+    printf '%s ERROR: %s\n' "$(date --iso-8601=seconds)" "$1" >> "$LOG_FILE"
+}
+
+exec 9> "$LOCK_FILE"
+if ! command -v flock > /dev/null; then
+    log_error "flock is required to prevent overlapping CodeRecall sessions."
+    exit 1
+fi
+flock -n -E 75 9
+LOCK_STATUS=$?
+if [ "$LOCK_STATUS" -eq 75 ]; then
+    log_error "A CodeRecall session is already running; skipping this invocation."
+    exit 0
+fi
+if [ "$LOCK_STATUS" -ne 0 ]; then
+    log_error "Could not acquire the CodeRecall session lock."
+    exit "$LOCK_STATUS"
+fi
+
 # GUI environment - required for Cron to launch a terminal window
 USER_ID=$(id -u)
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$USER_ID}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
 
-log_error() {
-    printf '%s ERROR: %s\n' "$(date --iso-8601=seconds)" "$1" >> "$PROJECT_DIR/recall_error.log"
-}
-
-if ! USER_ENVIRONMENT=$(systemctl --user show-environment 2>> "$PROJECT_DIR/recall_error.log"); then
+if ! USER_ENVIRONMENT=$(systemctl --user show-environment 2>> "$LOG_FILE"); then
     log_error "Could not read the user session environment. Is the graphical session running?"
     exit 1
 fi
@@ -58,17 +80,10 @@ if [ -n "$XAUTHORITY" ] && [ ! -r "$XAUTHORITY" ]; then
     exit 1
 fi
 
-# Run the app in a new terminal window
-# We redirect errors to a log file in case cron fails to launch the terminal
-{
-    if command -v gnome-terminal > /dev/null; then
-        gnome-terminal --wait --full-screen -- uv run main.py
-    else
-        uv run main.py
-    fi
-} 2>> recall_error.log
+if ! command -v gnome-terminal > /dev/null; then
+    log_error "gnome-terminal is required when launching CodeRecall from Cron."
+    exit 1
+fi
 
-# VRAM Optimization: stop the model after the app exits to free up GPU memory
-# Try to get MODEL_NAME from .env, fallback to gemma2:2b
-MODEL_NAME=$(grep MODEL_NAME .env | cut -d'=' -f2 | tr -d '"' || echo "gemma2:2b")
-ollama stop "$MODEL_NAME"
+gnome-terminal --wait --full-screen -- uv run main.py 2>> "$LOG_FILE"
+exit $?

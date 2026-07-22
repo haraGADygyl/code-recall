@@ -2,19 +2,13 @@
 
 CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or local LLMs to create multiple-choice questions from technical topics and markdown articles.
 
-![Startup](screenshots/00.png)
-*Main interface with a question.*
-
-![Interface](screenshots/01.png)
-*Main interface with question, answer and feedback.*
-
 ## 🚀 Features
 
 - **TUI Power**: A sleek terminal interface built with [Textual](https://textual.textualize.io/).
 - **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+T`.
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
 - **Quick Recall**: Choose from four plausible answers and get an immediate explanation without typing.
-- **VRAM Optimized**: The Cron launcher unloads the configured Ollama model after the app exits.
+- **VRAM Optimized**: Ollama questions unload the configured model after generation by default.
 
 ## 🛠 Setup
 
@@ -23,12 +17,19 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or lo
 - **[uv](https://github.com/astral-sh/uv)** (Python package manager)
 - **[OpenAI API Key](https://platform.openai.com/)** (for OpenAI provider) OR
 - **[Ollama](https://ollama.ai/)** (for local models, installed and available in PATH)
+- **GNOME Terminal, systemd, and `flock`** (only for scheduled desktop launches through `recall.sh`)
 
 ### 2. Installation
 Clone this repository and sync dependencies:
 
 ```bash
 uv sync
+```
+
+For development tools and tests:
+
+```bash
+uv sync --extra dev
 ```
 
 ### 3. Configuration
@@ -44,6 +45,15 @@ Open `.env` and adjust the variables:
 - `OPENAI_API_KEY`: Your OpenAI API key (required for OpenAI provider).
 - `OPENAI_MODEL_NAME`: The OpenAI model to use (defaults to `gpt-4.1-mini`).
 - `MODEL_NAME`: The Ollama model to use (defaults to `gemma2:2b`).
+- `DEFAULT_QUESTION_MODE`: Initial mode (`articles`, `rest-api`, `fastapi`, or `system-design`).
+- `ALLOW_REMOTE_ARTICLES`: Explicitly permits article contents to be sent to OpenAI (defaults to `false`).
+- `MAX_ARTICLE_BYTES`: Maximum accepted article size (defaults to 256 KiB).
+
+Restrict the local settings file because it contains credentials:
+
+```bash
+chmod 600 .env
+```
 
 ### 4. Prepare Articles
 Place your `.md` articles in the directory specified by `ARTICLES_DIR` in your `.env` file.
@@ -72,6 +82,21 @@ uv run main.py
 2. **Interaction**: Use the arrow keys to highlight an answer and press `Enter` to submit it.
 3. **Evaluation**: The app checks the selected answer locally and immediately shows the correct answer and rationale.
 4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The question's provider is shown below its answers.
+
+### Article Privacy
+
+Article mode rejects symlinks and oversized files. When OpenAI is selected, article generation is blocked unless `ALLOW_REMOTE_ARTICLES=true` explicitly permits sending article contents to OpenAI. Ollama article generation remains local.
+
+## Architecture
+
+Application code is split by responsibility under `code_recall/`:
+
+- `app.py`: Textual UI with exclusive workers and stale-result rejection
+- `config.py`: Settings, paths, and state-directory configuration
+- `content.py`: Safe article and topic loading
+- `domain.py`: Typed providers, modes, questions, and sessions
+- `providers.py`: OpenAI and Ollama adapters
+- `questions.py`: Prompt construction and question orchestration
 
 ## 💬 Commit Convention
 
@@ -102,7 +127,7 @@ To run CodeRecall every hour and have it pop up a terminal window:
     ```
 
 > [!NOTE]
-> The `recall.sh` script reads the active graphical session environment from the user systemd manager so Cron can open GNOME Terminal on the current desktop. If no graphical session is available, the script records the error in `recall_error.log`. It also reads the model name from `.env` for VRAM cleanup.
+> The `recall.sh` script reads the active graphical session environment from the user systemd manager so Cron can open GNOME Terminal on the current desktop. Only one session may run at a time; later invocations are skipped while a window remains open. Launcher errors are written to `${XDG_STATE_HOME:-~/.local/state}/code-recall/recall-error.log`.
 
 ---
 Created by [Tihomir Manushev](https://github.com/haraGADygyl).

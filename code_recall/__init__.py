@@ -1,0 +1,1 @@
+"""CodeRecall application package."""
