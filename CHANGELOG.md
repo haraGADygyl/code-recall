@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-03
+
+### Added
+
+- Answer length parity check that rejects questions whose correct answer stands out as the longest option
+- Bounded regeneration with corrective feedback when the correct answer gives itself away, configurable through `ANSWER_BALANCE_ATTEMPTS`
+
+### Changed
+
+- System prompt now states answer length parity as an explicit requirement and instructs distractors to carry the same level of technical detail
+- `QuestionService` takes settings at construction so regeneration limits are injected rather than hard-coded
+
+### Fixed
+
+- The correct answer was the longest option in 83% of generated questions, making it guessable without knowing the topic; it is now within 15% of the longest distractor in 87% of questions, with the average excess falling from 24 to 7 characters
+
 ## [0.1.8] - 2026-07-21
 
 ### Added

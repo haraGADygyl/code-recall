@@ -9,6 +9,7 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or lo
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
 - **Quick Recall**: Choose from four plausible answers, then press `Enter` or click Submit for an immediate explanation.
 - **Balanced System Design**: Draw from 88 senior-level topics across 11 categories, selecting a category before a topic.
+- **No Giveaway Answers**: Answer length is enforced, not just requested, so the correct option cannot be spotted by being the longest.
 - **VRAM Optimized**: Ollama questions unload the configured model after generation by default.
 
 ## 🛠 Setup
@@ -49,6 +50,7 @@ Open `.env` and adjust the variables:
 - `DEFAULT_QUESTION_MODE`: Initial mode (`articles`, `rest-api`, `fastapi`, or `system-design`).
 - `ALLOW_REMOTE_ARTICLES`: Explicitly permits article contents to be sent to OpenAI (defaults to `false`).
 - `MAX_ARTICLE_BYTES`: Maximum accepted article size (defaults to 256 KiB).
+- `ANSWER_BALANCE_ATTEMPTS`: Attempts allowed to stop the correct answer from being the longest option (defaults to `2`; `1` disables regeneration).
 
 Restrict the local settings file because it contains credentials:
 
@@ -85,6 +87,10 @@ uv run main.py
 4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The question's provider is shown below its answers.
 
 System-design questions use a categorized catalog. Each question independently selects one of 11 categories and then one of its 8 topics, keeping broad areas evenly represented without storing topic history.
+
+### Answer Length Parity
+
+Models write correct answers precisely and distractors tersely, which makes the correct option guessable from its length alone. Asking for parity in the prompt is not enough on its own, so every generated question is measured: if the correct answer exceeds the longest distractor by more than 15% (with a 10-character floor so terse answers such as `PUT` versus `POST` are never penalized), the question is regenerated with explicit corrective feedback. The feedback matters because Ollama generates at temperature zero and an identical retry would return an identical question. Length parity is a quality concern rather than a validity one, so exhausting `ANSWER_BALANCE_ATTEMPTS` returns the most balanced candidate instead of showing an error.
 
 ### Article Privacy
 

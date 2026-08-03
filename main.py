@@ -45,7 +45,7 @@ def build_app(settings: Settings) -> CodeRecallApp:
         Provider.OPENAI: OpenAIQuestionProvider(settings),
         Provider.OLLAMA: OllamaQuestionProvider(settings),
     }
-    question_service = QuestionService(ContentRepository(settings), providers)
+    question_service = QuestionService(settings, ContentRepository(settings), providers)
     return CodeRecallApp(settings, question_service)
 
 

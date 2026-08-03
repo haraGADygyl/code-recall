@@ -42,8 +42,9 @@ uv run main.py
 
 1. StartupScreen prepares the selected provider and validates the selected source mode
 2. Random article or technical topic selected → LLM generates a question, four answers, and rationale; system-design topics are selected category-first from a balanced catalog
-3. User selects an answer and presses Enter or clicks Submit → app evaluates it locally and displays the rationale
-4. Ollama unloads the configured model after generation unless `OLLAMA_KEEP_ALIVE` overrides the default
+3. If the correct answer stands out as the longest option, the question is regenerated with corrective feedback, falling back to the most balanced candidate rather than erroring
+4. User selects an answer and presses Enter or clicks Submit → app evaluates it locally and displays the rationale
+5. Ollama unloads the configured model after generation unless `OLLAMA_KEEP_ALIVE` overrides the default
 
 ### Key Bindings
 
@@ -64,6 +65,7 @@ Environment variables in `.env` (see `.env.example`):
 - `DEFAULT_QUESTION_MODE` - Initial article or technical-topic mode
 - `ALLOW_REMOTE_ARTICLES` - Required opt-in for sending article contents to OpenAI
 - `MAX_ARTICLE_BYTES` - Maximum article size accepted for generation
+- `ANSWER_BALANCE_ATTEMPTS` - Attempts allowed to stop the correct answer from being the longest option
 
 ## Changelog
 

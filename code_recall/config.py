@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     ALLOW_REMOTE_ARTICLES: bool = False
     MAX_ARTICLE_BYTES: int = Field(default=262_144, gt=0)
 
+    ANSWER_BALANCE_ATTEMPTS: int = Field(default=2, ge=1, le=4)
+
     LOG_MAX_BYTES: int = Field(default=1_048_576, gt=0)
     LOG_BACKUP_COUNT: int = Field(default=3, ge=1, le=10)
 

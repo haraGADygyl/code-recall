@@ -67,3 +67,56 @@ def test_rejects_catch_all_answers(answer: str) -> None:
 def test_rejects_excessively_long_content() -> None:
     with pytest.raises(ValidationError):
         make_question(question="x" * 501)
+
+
+def test_length_imbalance_measures_gap_to_longest_distractor() -> None:
+    question = make_question(
+        correct_answer="x" * 60,
+        distractors=["y" * 40, "z" * 45, "w" * 30],
+    )
+
+    assert question.length_imbalance == 15
+
+
+def test_length_imbalance_is_negative_when_correct_answer_is_short() -> None:
+    question = make_question(
+        correct_answer="x" * 20,
+        distractors=["y" * 40, "z" * 45, "w" * 30],
+    )
+
+    assert question.length_imbalance == -25
+
+
+def test_conspicuously_long_correct_answer_is_unbalanced() -> None:
+    question = make_question(
+        correct_answer="x" * 114,
+        distractors=["y" * 71, "z" * 61, "w" * 57],
+    )
+
+    assert not question.has_balanced_answers
+
+
+def test_similar_length_answers_are_balanced() -> None:
+    question = make_question(
+        correct_answer="x" * 84,
+        distractors=["y" * 85, "z" * 76, "w" * 65],
+    )
+
+    assert question.has_balanced_answers
+
+
+def test_terse_answers_are_never_penalized() -> None:
+    """Short token answers such as PUT versus POST must not trip the length check."""
+    question = make_question(correct_answer="PUT", distractors=["POST", "PATCH", "GET"])
+
+    assert question.has_balanced_answers
+
+
+def test_long_answers_are_judged_on_relative_difference() -> None:
+    """A 12-character gap is a giveaway among short answers but noise among long ones."""
+    question = make_question(
+        correct_answer="x" * 131,
+        distractors=["y" * 119, "z" * 110, "w" * 85],
+    )
+
+    assert question.has_balanced_answers

@@ -25,6 +25,13 @@ MODE_LABELS: dict[QuestionMode, str] = {
 }
 
 
+ANSWER_LENGTH_SLACK_RATIO = 0.15
+"""Fraction by which the correct answer may exceed the longest distractor."""
+
+MIN_ANSWER_LENGTH_SLACK = 10
+"""Character slack always allowed, so terse answers are never penalized."""
+
+
 class CodeRecallError(Exception):
     """Base class for errors that can be shown safely to the user."""
 
@@ -80,6 +87,27 @@ class MultipleChoiceQuestion(BaseModel):
     @property
     def all_answers(self) -> list[str]:
         return [self.correct_answer, *self.distractors]
+
+    @property
+    def length_imbalance(self) -> int:
+        """Characters by which the correct answer exceeds the longest distractor.
+
+        Positive values mean the correct answer is the longest option, which lets
+        the answer be guessed from its shape alone. Lower is better.
+        """
+        return len(self.correct_answer) - max(len(distractor) for distractor in self.distractors)
+
+    @property
+    def has_balanced_answers(self) -> bool:
+        """Whether the correct answer avoids standing out by length.
+
+        The allowance is proportional so that sets of long answers are judged on
+        relative difference, with an absolute floor so that terse answers such as
+        ``PUT`` versus ``POST`` are never rejected over a few characters.
+        """
+        longest_distractor = max(len(distractor) for distractor in self.distractors)
+        slack = max(MIN_ANSWER_LENGTH_SLACK, round(longest_distractor * ANSWER_LENGTH_SLACK_RATIO))
+        return self.length_imbalance <= slack
 
 
 @dataclass(frozen=True, slots=True)
