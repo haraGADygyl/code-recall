@@ -1,0 +1,112 @@
+{
+  "Data Model and Protocols": [
+    "Dunder methods and the Python data model contract",
+    "__eq__ and __hash__ consistency for dictionary and set keys",
+    "__getattr__ versus __getattribute__ attribute lookup",
+    "Descriptor protocol and __get__, __set__, and __set_name__",
+    "Context manager protocol and contextlib helpers",
+    "__slots__ and its effect on instances and inheritance",
+    "Rich comparison methods and reflected operand fallback",
+    "__repr__ versus __str__ and __format__ responsibilities"
+  ],
+  "Objects, Types, and Metaprogramming": [
+    "Method resolution order and C3 linearization",
+    "Cooperative multiple inheritance with super()",
+    "Metaclasses and the type() three-argument form",
+    "__init_subclass__ as a lightweight metaclass alternative",
+    "Abstract base classes, virtual subclasses, and __subclasshook__",
+    "Class attributes versus instance attributes and shared mutable defaults",
+    "Dataclasses, frozen instances, and field factories",
+    "Bound, unbound, class, and static method dispatch"
+  ],
+  "Functions, Closures, and Decorators": [
+    "Closures, cell objects, and the nonlocal keyword",
+    "Mutable default argument evaluation at definition time",
+    "Positional-only and keyword-only parameter syntax",
+    "Decorators with arguments and functools.wraps metadata",
+    "functools.partial versus lambda for argument binding",
+    "functools.lru_cache and cache invalidation semantics",
+    "singledispatch and generic function overloading",
+    "Function introspection with the inspect module and signatures"
+  ],
+  "Iterators, Generators, and Comprehensions": [
+    "Iterator versus iterable and the __iter__ and __next__ contract",
+    "Generator state machine, send(), throw(), and close()",
+    "yield from delegation and subgenerator return values",
+    "Comprehension scoping rules and the walrus operator",
+    "Lazy evaluation and memory trade-offs of itertools pipelines",
+    "itertools.tee, islice, and chain usage patterns",
+    "Generator-based pipelines versus materialized lists",
+    "StopIteration handling and PEP 479 generator semantics"
+  ],
+  "Concurrency and Parallelism": [
+    "The global interpreter lock and its effect on CPU-bound threads",
+    "threading versus multiprocessing selection criteria",
+    "concurrent.futures executors and future lifecycle",
+    "Process start methods: fork, spawn, and forkserver",
+    "Inter-process communication with queues, pipes, and shared memory",
+    "Thread-safety of built-in types and race condition sources",
+    "threading.local and per-thread state isolation",
+    "Free-threaded CPython and per-interpreter GIL directions"
+  ],
+  "Asynchronous Python": [
+    "Coroutines, awaitables, and the event loop scheduling model",
+    "asyncio.gather versus TaskGroup error propagation",
+    "Task cancellation, CancelledError, and shielding",
+    "Blocking calls in the event loop and run_in_executor",
+    "Async context managers and async iterators",
+    "asyncio synchronization primitives and queues",
+    "asyncio.timeout and structured concurrency scopes",
+    "Bridging synchronous and asynchronous code safely"
+  ],
+  "Memory, Performance, and Internals": [
+    "Reference counting, cyclic garbage collection, and generations",
+    "weakref, WeakValueDictionary, and cache lifetime control",
+    "Small integer and string interning in CPython",
+    "Bytecode compilation and the dis module",
+    "Copy semantics: assignment, shallow copy, and deep copy",
+    "Profiling with cProfile, timeit, and tracemalloc",
+    "String concatenation costs and join versus loop accumulation",
+    "Attribute lookup cost, __dict__ layout, and key-sharing dictionaries"
+  ],
+  "Typing and Static Analysis": [
+    "Invariance, covariance, and contravariance in generics",
+    "Protocol classes and structural subtyping",
+    "TypeVar, ParamSpec, and the PEP 695 type parameter syntax",
+    "Optional, union types, and narrowing with TypeGuard",
+    "Literal, Final, and NewType for stricter domains",
+    "TYPE_CHECKING guards and postponed annotation evaluation",
+    "Overload declarations for multi-signature functions",
+    "Runtime type introspection with get_type_hints and get_origin"
+  ],
+  "Standard Library and Data Structures": [
+    "dict insertion order guarantees and hash collision behavior",
+    "collections.deque, defaultdict, and Counter trade-offs",
+    "heapq and bisect for priority and ordered access",
+    "Set operations, frozenset, and membership complexity",
+    "pathlib versus os.path for filesystem operations",
+    "Decimal and Fraction versus binary floating point",
+    "enum, StrEnum, IntFlag, and member aliasing",
+    "Serialization choices: json, pickle, and their security limits"
+  ],
+  "Packaging, Imports, and Environments": [
+    "Import system phases: finders, loaders, and sys.modules caching",
+    "Absolute versus relative imports and circular import breaking",
+    "Regular packages, namespace packages, and __init__ semantics",
+    "pyproject.toml metadata, build backends, and editable installs",
+    "Virtual environments, site-packages, and dependency resolution",
+    "Entry points, console scripts, and plugin discovery",
+    "Wheels versus source distributions and platform tags",
+    "Version constraints, lock files, and reproducible installs"
+  ],
+  "Errors, Testing, and Reliability": [
+    "Exception chaining with raise from and __context__",
+    "Exception groups and except* handling",
+    "try/except/else/finally evaluation order and return interaction",
+    "Custom exception hierarchies and error boundary design",
+    "Context managers for deterministic resource cleanup",
+    "pytest fixtures, scopes, and dependency injection",
+    "Monkeypatching and dependency isolation in tests",
+    "Logging configuration, propagation, and handler hierarchy"
+  ]
+}

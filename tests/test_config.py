@@ -18,9 +18,9 @@ def test_settings_construct_without_openai_key() -> None:
 
 
 def test_relative_paths_are_anchored_to_project_root() -> None:
-    settings = Settings(_env_file=None, ARTICLES_DIR=Path("custom-articles"))  # type: ignore[call-arg]
+    settings = Settings(_env_file=None, ADVANCED_PYTHON_TOPICS_FILE=Path("custom/topics.json"))  # type: ignore[call-arg]
 
-    assert settings.ARTICLES_DIR == PROJECT_ROOT / "custom-articles"
+    assert settings.ADVANCED_PYTHON_TOPICS_FILE == PROJECT_ROOT / "custom/topics.json"
 
 
 def test_settings_parse_enums(make_settings: Callable[..., Settings]) -> None:

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-09-05
+
+### Added
+
+- Advanced Python question mode backed by a categorized catalog of 88 senior-level topics across 11 balanced categories
+- Test that every selectable question mode resolves to a shipped topic catalog
+
+### Removed
+
+- Articles question mode, the `articles/` directory, and markdown article loading
+- `ARTICLES_DIR`, `ALLOW_REMOTE_ARTICLES`, and `MAX_ARTICLE_BYTES` settings
+
+### Changed
+
+- All question modes are now topic-driven, so `ContentRepository` no longer reads user files or takes a provider argument for remote-upload policy
+- Prompt construction dropped its article branch and builds every prompt from a mode label, category, and topic
+
 ## [0.1.9] - 2026-08-03
 
 ### Added

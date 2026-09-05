@@ -20,7 +20,7 @@ def make_settings(tmp_path: Path) -> Callable[..., Settings]:
         values: dict[str, object] = {
             "DEFAULT_PROVIDER": "ollama",
             "DEFAULT_QUESTION_MODE": "system-design",
-            "ARTICLES_DIR": tmp_path / "articles",
+            "ADVANCED_PYTHON_TOPICS_FILE": tmp_path / "advanced-python.json",
             "REST_API_TOPICS_FILE": tmp_path / "rest.json",
             "FASTAPI_TOPICS_FILE": tmp_path / "fastapi.json",
             "SYSTEM_DESIGN_TOPICS_FILE": tmp_path / "system-design.json",

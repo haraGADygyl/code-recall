@@ -1,11 +1,9 @@
 import json
-import os
 import random
-import stat
 from pathlib import Path
 
 from code_recall.config import Settings
-from code_recall.domain import ContentError, Provider, QuestionMode, SourceMaterial
+from code_recall.domain import ContentError, QuestionMode, SourceMaterial
 
 
 class _DuplicateCategoryError(ValueError):
@@ -25,93 +23,20 @@ def _catalog_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 
 class ContentRepository:
-    """Load and validate article or topic source material."""
+    """Load and validate typed topic source material."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    def validate_mode(self, mode: QuestionMode, provider: Provider) -> None:
-        if mode is QuestionMode.ARTICLES:
-            self._validate_article_policy(provider)
-            self._article_files()
-            return
+    def validate_mode(self, mode: QuestionMode) -> None:
         self._topic_catalog(mode)
 
-    def select(self, mode: QuestionMode, provider: Provider) -> SourceMaterial:
-        if mode is QuestionMode.ARTICLES:
-            self._validate_article_policy(provider)
-            path = random.choice(self._article_files())
-            return SourceMaterial(mode=mode, title=path.name, content=self._read_article(path))
-
+    def select(self, mode: QuestionMode) -> SourceMaterial:
         catalog = self._topic_catalog(mode)
         category = random.choice(list(catalog))
         topic = random.choice(catalog[category])
         title = topic if category is None else f"{category}: {topic}"
         return SourceMaterial(mode=mode, title=title, content=topic, category=category)
-
-    def _validate_article_policy(self, provider: Provider) -> None:
-        if provider is Provider.OPENAI and not self.settings.ALLOW_REMOTE_ARTICLES:
-            raise ContentError(
-                "Article mode with OpenAI is disabled. Set ALLOW_REMOTE_ARTICLES=true "
-                "to permit sending article contents to OpenAI, or switch to Ollama."
-            )
-
-    def _article_files(self) -> list[Path]:
-        root = self.settings.ARTICLES_DIR
-        try:
-            resolved_root = root.resolve(strict=True)
-        except OSError as error:
-            raise ContentError(f"Articles directory is unavailable: {root}") from error
-
-        if not resolved_root.is_dir():
-            raise ContentError(f"Articles path is not a directory: {root}")
-
-        files: list[Path] = []
-        try:
-            candidates = list(resolved_root.glob("*.md"))
-        except OSError as error:
-            raise ContentError(f"Could not list articles in {root}") from error
-
-        for candidate in candidates:
-            if candidate.is_symlink() or not candidate.is_file():
-                continue
-            try:
-                resolved = candidate.resolve(strict=True)
-                resolved.relative_to(resolved_root)
-            except (OSError, ValueError):
-                continue
-            files.append(resolved)
-
-        if not files:
-            raise ContentError(f"No safe .md files found in {root}")
-        return files
-
-    def _read_article(self, path: Path) -> str:
-        try:
-            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-        except OSError as error:
-            raise ContentError(f"Could not read article: {path.name}") from error
-
-        try:
-            with os.fdopen(descriptor, "rb") as article:
-                file_stat = os.fstat(article.fileno())
-                if not stat.S_ISREG(file_stat.st_mode):
-                    raise ContentError(f"Article is not a regular file: {path.name}")
-                if file_stat.st_size > self.settings.MAX_ARTICLE_BYTES:
-                    raise ContentError(
-                        f"Article {path.name} is too large ({file_stat.st_size} bytes); "
-                        f"limit is {self.settings.MAX_ARTICLE_BYTES} bytes"
-                    )
-                data = article.read(self.settings.MAX_ARTICLE_BYTES + 1)
-        except OSError as error:
-            raise ContentError(f"Could not read article: {path.name}") from error
-
-        if len(data) > self.settings.MAX_ARTICLE_BYTES:
-            raise ContentError(f"Article {path.name} grew beyond the configured size limit while reading")
-        try:
-            return data.decode("utf-8")
-        except UnicodeDecodeError as error:
-            raise ContentError(f"Article is not valid UTF-8: {path.name}") from error
 
     def _topic_catalog(self, mode: QuestionMode) -> dict[str | None, tuple[str, ...]]:
         path = self._topic_path(mode)
@@ -159,6 +84,7 @@ class ContentRepository:
 
     def _topic_path(self, mode: QuestionMode) -> Path:
         paths = {
+            QuestionMode.ADVANCED_PYTHON: self.settings.ADVANCED_PYTHON_TOPICS_FILE,
             QuestionMode.REST_API: self.settings.REST_API_TOPICS_FILE,
             QuestionMode.FASTAPI: self.settings.FASTAPI_TOPICS_FILE,
             QuestionMode.SYSTEM_DESIGN: self.settings.SYSTEM_DESIGN_TOPICS_FILE,

@@ -1,6 +1,6 @@
 # 🧠 CodeRecall
 
-CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or local LLMs to create multiple-choice questions from technical topics and markdown articles.
+CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or local LLMs to create multiple-choice questions from curated technical topics.
 
 ## 🚀 Features
 
@@ -8,7 +8,8 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or lo
 - **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+T`.
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
 - **Quick Recall**: Choose from four plausible answers, then press `Enter` or click Submit for an immediate explanation.
-- **Balanced System Design**: Draw from 88 senior-level topics across 11 categories, selecting a category before a topic.
+- **Balanced Catalogs**: Advanced Python and System Design each draw from 88 senior-level topics across 11 categories, selecting a category before a topic.
+- **Advanced Python On Demand**: Every Python question is generated from the catalog at request time, so no article library has to be maintained.
 - **No Giveaway Answers**: Answer length is enforced, not just requested, so the correct option cannot be spotted by being the longest.
 - **VRAM Optimized**: Ollama questions unload the configured model after generation by default.
 
@@ -42,14 +43,11 @@ cp .env.example .env
 ```
 
 Open `.env` and adjust the variables:
-- `ARTICLES_DIR`: The path to your markdown files (defaults to `./articles`).
 - `DEFAULT_PROVIDER`: LLM provider to use - `openai` (default) or `ollama`.
 - `OPENAI_API_KEY`: Your OpenAI API key (required for OpenAI provider).
 - `OPENAI_MODEL_NAME`: The OpenAI model to use (defaults to `gpt-4.1-mini`).
 - `MODEL_NAME`: The Ollama model to use (defaults to `gemma2:2b`).
-- `DEFAULT_QUESTION_MODE`: Initial mode (`articles`, `rest-api`, `fastapi`, or `system-design`).
-- `ALLOW_REMOTE_ARTICLES`: Explicitly permits article contents to be sent to OpenAI (defaults to `false`).
-- `MAX_ARTICLE_BYTES`: Maximum accepted article size (defaults to 256 KiB).
+- `DEFAULT_QUESTION_MODE`: Initial mode (`advanced-python`, `rest-api`, `fastapi`, or `system-design`).
 - `ANSWER_BALANCE_ATTEMPTS`: Attempts allowed to stop the correct answer from being the longest option (defaults to `2`; `1` disables regeneration).
 
 Restrict the local settings file because it contains credentials:
@@ -57,9 +55,6 @@ Restrict the local settings file because it contains credentials:
 ```bash
 chmod 600 .env
 ```
-
-### 4. Prepare Articles
-Place your `.md` articles in the directory specified by `ARTICLES_DIR` in your `.env` file.
 
 ## 🎮 Usage
 
@@ -81,20 +76,16 @@ uv run main.py
 
 ## ⚙️ How it Works
 
-1. **Generation**: The app selects an article or technical topic and asks the LLM for one question, one correct answer, three distractors, and a rationale.
+1. **Generation**: The app selects a technical topic and asks the LLM for one question, one correct answer, three distractors, and a rationale.
 2. **Interaction**: Use the arrow keys to highlight an answer, then press `Enter` or click Submit.
 3. **Evaluation**: The app checks the selected answer locally and immediately shows the correct answer and rationale.
 4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The question's provider is shown below its answers.
 
-System-design questions use a categorized catalog. Each question independently selects one of 11 categories and then one of its 8 topics, keeping broad areas evenly represented without storing topic history.
+Advanced Python and System Design questions use categorized catalogs. Each question independently selects one of 11 categories and then one of its 8 topics, keeping broad areas evenly represented without storing topic history. Question modes are entirely topic-driven, so nothing is read from disk beyond the shipped catalogs.
 
 ### Answer Length Parity
 
 Models write correct answers precisely and distractors tersely, which makes the correct option guessable from its length alone. Asking for parity in the prompt is not enough on its own, so every generated question is measured: if the correct answer exceeds the longest distractor by more than 15% (with a 10-character floor so terse answers such as `PUT` versus `POST` are never penalized), the question is regenerated with explicit corrective feedback. The feedback matters because Ollama generates at temperature zero and an identical retry would return an identical question. Length parity is a quality concern rather than a validity one, so exhausting `ANSWER_BALANCE_ATTEMPTS` returns the most balanced candidate instead of showing an error.
-
-### Article Privacy
-
-Article mode rejects symlinks and oversized files. When OpenAI is selected, article generation is blocked unless `ALLOW_REMOTE_ARTICLES=true` explicitly permits sending article contents to OpenAI. Ollama article generation remains local.
 
 ## Architecture
 
@@ -102,7 +93,7 @@ Application code is split by responsibility under `code_recall/`:
 
 - `app.py`: Textual UI with exclusive workers and stale-result rejection
 - `config.py`: Settings, paths, and state-directory configuration
-- `content.py`: Safe article and topic loading
+- `content.py`: Typed topic catalog loading
 - `domain.py`: Typed providers, modes, questions, and sessions
 - `providers.py`: OpenAI and Ollama adapters
 - `questions.py`: Prompt construction and question orchestration

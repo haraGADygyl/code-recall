@@ -27,13 +27,10 @@ class Settings(BaseSettings):
     DEFAULT_PROVIDER: Provider = Provider.OPENAI
     DEFAULT_QUESTION_MODE: QuestionMode = QuestionMode.SYSTEM_DESIGN
 
-    ARTICLES_DIR: Path = PROJECT_ROOT / "articles"
+    ADVANCED_PYTHON_TOPICS_FILE: Path = PROJECT_ROOT / "data/advanced_python_topics.json"
     REST_API_TOPICS_FILE: Path = PROJECT_ROOT / "data/rest_api_topics.json"
     FASTAPI_TOPICS_FILE: Path = PROJECT_ROOT / "data/fastapi_topics.json"
     SYSTEM_DESIGN_TOPICS_FILE: Path = PROJECT_ROOT / "data/system_design_topics.json"
-
-    ALLOW_REMOTE_ARTICLES: bool = False
-    MAX_ARTICLE_BYTES: int = Field(default=262_144, gt=0)
 
     ANSWER_BALANCE_ATTEMPTS: int = Field(default=2, ge=1, le=4)
 
@@ -57,7 +54,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def resolve_paths(self) -> Self:
         for field_name in (
-            "ARTICLES_DIR",
+            "ADVANCED_PYTHON_TOPICS_FILE",
             "REST_API_TOPICS_FILE",
             "FASTAPI_TOPICS_FILE",
             "SYSTEM_DESIGN_TOPICS_FILE",
