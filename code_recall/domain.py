@@ -14,6 +14,7 @@ class QuestionMode(StrEnum):
     ADVANCED_PYTHON = "advanced-python"
     REST_API = "rest-api"
     FASTAPI = "fastapi"
+    LANGCHAIN = "langchain"
     SYSTEM_DESIGN = "system-design"
 
 
@@ -21,6 +22,7 @@ MODE_LABELS: dict[QuestionMode, str] = {
     QuestionMode.ADVANCED_PYTHON: "Advanced Python",
     QuestionMode.REST_API: "REST API Design",
     QuestionMode.FASTAPI: "FastAPI",
+    QuestionMode.LANGCHAIN: "LangChain",
     QuestionMode.SYSTEM_DESIGN: "System Design",
 }
 

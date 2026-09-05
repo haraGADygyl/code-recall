@@ -23,6 +23,7 @@ def make_settings(tmp_path: Path) -> Callable[..., Settings]:
             "ADVANCED_PYTHON_TOPICS_FILE": tmp_path / "advanced-python.json",
             "REST_API_TOPICS_FILE": tmp_path / "rest.json",
             "FASTAPI_TOPICS_FILE": tmp_path / "fastapi.json",
+            "LANGCHAIN_TOPICS_FILE": tmp_path / "langchain.json",
             "SYSTEM_DESIGN_TOPICS_FILE": tmp_path / "system-design.json",
         }
         values.update(overrides)

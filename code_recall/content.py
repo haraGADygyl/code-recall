@@ -87,6 +87,7 @@ class ContentRepository:
             QuestionMode.ADVANCED_PYTHON: self.settings.ADVANCED_PYTHON_TOPICS_FILE,
             QuestionMode.REST_API: self.settings.REST_API_TOPICS_FILE,
             QuestionMode.FASTAPI: self.settings.FASTAPI_TOPICS_FILE,
+            QuestionMode.LANGCHAIN: self.settings.LANGCHAIN_TOPICS_FILE,
             QuestionMode.SYSTEM_DESIGN: self.settings.SYSTEM_DESIGN_TOPICS_FILE,
         }
         try:

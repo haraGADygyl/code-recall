@@ -1,0 +1,112 @@
+{
+  "Core Abstractions and LCEL": [
+    "The Runnable interface and invoke, batch, and stream contracts",
+    "Composing chains with the pipe operator in LCEL",
+    "RunnableParallel and RunnablePassthrough for branching data flow",
+    "RunnableLambda and coercing plain functions into chains",
+    "Configurable fields and runtime configuration with with_config",
+    "Fallbacks and retries with with_fallbacks and with_retry",
+    "Synchronous and asynchronous execution paths for runnables",
+    "Migrating legacy LLMChain and AgentExecutor code to v1 equivalents"
+  ],
+  "Models, Messages, and Prompts": [
+    "Chat model initialization with init_chat_model and provider strings",
+    "Message types: system, human, AI, tool, and their roles",
+    "Prompt templates, partial variables, and message placeholders",
+    "Few-shot prompting and example selectors",
+    "Multimodal message content blocks for images and files",
+    "Token usage metadata and cost accounting on responses",
+    "Rate limiters, timeouts, and provider retry configuration",
+    "Model caching and deterministic responses in tests"
+  ],
+  "Tools and Structured Output": [
+    "Defining tools with the @tool decorator and docstring schemas",
+    "Pydantic argument schemas and tool input validation",
+    "Tool calls, ToolMessage, and the tool-call response cycle",
+    "Parallel tool calls and handling multiple calls per turn",
+    "Structured output with with_structured_output and response formats",
+    "Tool errors, retries, and returning failures to the model",
+    "ToolNode behavior and injecting state into tool arguments",
+    "Choosing between tool calling, JSON mode, and output parsers"
+  ],
+  "Agents with create_agent": [
+    "The create_agent loop: model call, tool execution, and termination",
+    "Agent middleware and the before and after model hooks",
+    "Custom state schemas for carrying data across agent steps",
+    "Dynamic system prompts and per-step model or tool selection",
+    "Structured final responses from an agent run",
+    "Recursion limits and guarding against runaway agent loops",
+    "Deep Agents harness: planning, sub-agents, and filesystem context",
+    "Choosing between create_agent, Deep Agents, and a custom graph"
+  ],
+  "LangGraph Graph Construction": [
+    "StateGraph nodes, edges, and the START and END sentinels",
+    "State schemas, annotated reducers, and message accumulation",
+    "Conditional edges and routing on state",
+    "Compiling a graph and the CompiledStateGraph runtime",
+    "Send API for dynamic fan-out and map-reduce workloads",
+    "Subgraphs, namespacing, and state sharing between graphs",
+    "Multi-agent patterns: supervisor, handoffs, and swarm",
+    "Node retry policies, caching, and deterministic replay"
+  ],
+  "Persistence, Memory, and Durability": [
+    "Checkpointers and saving graph state after every super-step",
+    "Threads, thread_id, and isolating conversation history",
+    "Short-term memory in state versus long-term memory in the Store",
+    "Durable execution and resuming after a crash or restart",
+    "State snapshots, get_state, and inspecting run history",
+    "Time travel: replaying and forking from a past checkpoint",
+    "Trimming, summarizing, and managing context window growth",
+    "Cross-thread memory, namespaces, and semantic recall"
+  ],
+  "Human in the Loop and Control Flow": [
+    "The interrupt function and pausing a graph mid-execution",
+    "Command objects for resuming with a value or routing",
+    "Approval gates and reviewing tool calls before execution",
+    "Static and dynamic breakpoints for debugging a run",
+    "Editing graph state before resuming execution",
+    "Timeouts, step limits, and cancellation of in-flight runs",
+    "Error recovery and compensating actions in long workflows",
+    "Designing idempotent nodes for safe replay after resume"
+  ],
+  "Streaming and Observability Hooks": [
+    "Stream modes: values, updates, messages, custom, and debug",
+    "Token-level streaming from nested model calls",
+    "Streaming through subgraphs with namespaced chunks",
+    "astream_events and the structured event taxonomy",
+    "Callback handlers and the run tree lifecycle",
+    "Custom progress events emitted from inside a node",
+    "Streaming structured output and merging partial objects",
+    "Async iteration, backpressure, and consumer cancellation"
+  ],
+  "Retrieval and Vector Stores": [
+    "Embedding models, dimensionality, and normalization",
+    "Vector store interface and similarity search parameters",
+    "Maximal marginal relevance versus pure similarity ranking",
+    "Metadata filtering and hybrid dense plus keyword search",
+    "Document loaders and normalizing source metadata",
+    "Text splitters, chunk size, and overlap trade-offs",
+    "The indexing API for deduplication and incremental sync",
+    "Retriever abstractions and multi-query or ensemble retrieval"
+  ],
+  "RAG Patterns and Quality": [
+    "Naive RAG pipeline versus agentic retrieval loops",
+    "Query rewriting and decomposition for better recall",
+    "Reranking retrieved candidates before generation",
+    "Grounding answers with citations and source attribution",
+    "Detecting and mitigating hallucination in generated answers",
+    "Corrective and self-reflective RAG control flow",
+    "Context assembly, ordering, and lost-in-the-middle effects",
+    "Retrieval metrics: recall, precision, and answer faithfulness"
+  ],
+  "LangSmith and Production Operations": [
+    "Tracing runs and reading the run tree hierarchy",
+    "Datasets, examples, and building regression suites",
+    "Evaluators, LLM-as-judge scoring, and custom metrics",
+    "Experiments and comparing model or prompt versions",
+    "User feedback capture and linking it to traces",
+    "Prompt versioning and promotion through environments",
+    "Monitoring latency, token cost, and error rates in production",
+    "Deployment options and environment configuration for agents"
+  ]
+}

@@ -1,6 +1,6 @@
 [project]
 name = "code-recall"
-version = "0.1.10"
+version = "0.1.13"
 description = "Multiple-choice recall of technical knowledge from curated interview topics"
 readme = "README.md"
 requires-python = ">=3.12"

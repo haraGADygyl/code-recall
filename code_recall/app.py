@@ -5,7 +5,7 @@ from rich.markdown import Markdown
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Footer, Label, LoadingIndicator, OptionList, Static
 
 from code_recall.config import Settings
@@ -85,12 +85,79 @@ class StartupScreen(Screen[None]):
         self.app.exit()
 
 
+class ModePickerScreen(ModalScreen[QuestionMode | None]):
+    """Choose the question topic by click or keyboard."""
+
+    BINDINGS = [("escape", "cancel", "Cancel")]
+
+    def __init__(self, current_mode: QuestionMode) -> None:
+        super().__init__()
+        self.current_mode = current_mode
+
+    def compose(self) -> ComposeResult:
+        yield Vertical(
+            Label("Choose a topic", id="mode-picker-title"),
+            OptionList(*(self._prompt(mode) for mode in QuestionMode), id="mode-options", markup=False),
+            Label("Enter to select, Esc to cancel", id="mode-picker-hint"),
+            id="mode-picker",
+        )
+
+    def _prompt(self, mode: QuestionMode) -> str:
+        marker = ">" if mode is self.current_mode else " "
+        return f"{marker} {MODE_LABELS[mode]}"
+
+    def on_mount(self) -> None:
+        options = self.query_one("#mode-options", OptionList)
+        options.highlighted = list(QuestionMode).index(self.current_mode)
+        options.focus()
+
+    @on(OptionList.OptionSelected, "#mode-options")
+    def pick_mode(self, event: OptionList.OptionSelected) -> None:
+        self.dismiss(list(QuestionMode)[event.option_index])
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class CodeRecallApp(App[None]):
     CSS = """
     Screen {
         align: center middle;
         background: #1e1e1e;
         overflow-y: scroll;
+    }
+
+    ModePickerScreen {
+        align: center middle;
+        background: #000000 60%;
+    }
+
+    #mode-picker {
+        width: 44;
+        height: auto;
+        border: solid #00ff00;
+        background: #1e1e1e;
+        padding: 1 2;
+    }
+
+    #mode-picker-title {
+        width: 100%;
+        text-align: center;
+        text-style: bold;
+        color: #00ff00;
+        margin-bottom: 1;
+    }
+
+    #mode-options {
+        height: auto;
+        border: solid #555;
+    }
+
+    #mode-picker-hint {
+        width: 100%;
+        text-align: center;
+        color: #888;
+        margin-top: 1;
     }
 
     #startup-container {
@@ -112,6 +179,14 @@ class CodeRecallApp(App[None]):
         align: center middle;
         height: auto;
         margin-top: 1;
+    }
+
+    #topic-label {
+        width: 100%;
+        text-align: center;
+        color: #00ff00;
+        text-style: bold;
+        margin-bottom: 1;
     }
 
     #main-container {
@@ -193,7 +268,7 @@ class CodeRecallApp(App[None]):
         ("ctrl+q", "quit", "Quit"),
         ("ctrl+n", "next_question", "Next"),
         ("ctrl+t", "toggle_provider", "Toggle Provider"),
-        ("ctrl+r", "toggle_question_mode", "Toggle Mode"),
+        ("ctrl+r", "select_question_mode", "Choose Topic"),
     ]
 
     def __init__(self, settings: Settings, question_service: QuestionService) -> None:
@@ -209,6 +284,7 @@ class CodeRecallApp(App[None]):
 
     def compose(self) -> ComposeResult:
         with Container(id="main-container"):
+            yield Label("", id="topic-label")
             yield Label("Loading Question...", id="main-status")
 
             with Vertical(id="interaction-area", classes="hidden"):
@@ -263,11 +339,18 @@ class CodeRecallApp(App[None]):
         self._provider_check_pending = False
         self.notify(message, severity="error")
 
-    def action_toggle_question_mode(self) -> None:
-        modes = list(QuestionMode)
-        current_index = modes.index(self.current_question_mode)
-        self.current_question_mode = modes[(current_index + 1) % len(modes)]
-        self.notify(f"Next question mode: {MODE_LABELS[self.current_question_mode]}", severity="information")
+    def action_select_question_mode(self) -> None:
+        if len(self.screen_stack) > 1:
+            return
+        self.push_screen(ModePickerScreen(self.current_question_mode), self._apply_question_mode)
+
+    def _apply_question_mode(self, mode: QuestionMode | None) -> None:
+        """Load a question in the chosen topic, treating a re-pick of the current topic as a no-op."""
+        if mode is None or mode is self.current_question_mode:
+            return
+        self.current_question_mode = mode
+        self.notify(f"Switched to {MODE_LABELS[mode]}", severity="information")
+        self.load_new_session()
 
     def load_new_session(self) -> None:
         self._generation_id += 1
@@ -277,11 +360,12 @@ class CodeRecallApp(App[None]):
         self.active_session = None
         self.answer_submitted = False
 
+        self.query_one("#topic-label", Label).update(f"Topic: {MODE_LABELS[mode]}")
         self.query_one("#interaction-area").add_class("hidden")
         self.query_one("#feedback-container").add_class("hidden")
         self.query_one("#question-box", Static).update("Generating question...")
         self.query_one("#main-status", Label).remove_class("hidden")
-        self.query_one("#main-status", Label).update(f"Generating {MODE_LABELS[mode]} question...")
+        self.query_one("#main-status", Label).update("Generating question...")
         answer_options = self.query_one("#answer-options", OptionList)
         answer_options.set_options([])
         answer_options.disabled = False

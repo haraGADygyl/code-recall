@@ -8,8 +8,9 @@ CodeRecall is a lightweight, terminal-based flashcard app that uses OpenAI or lo
 - **Dual LLM Support**: Choose between [OpenAI](https://openai.com/) (default) or local [Ollama](https://ollama.ai/) models. Switch providers on-the-fly with `Ctrl+T`.
 - **Stay Focused**: Designed to be triggered by an OS scheduler (like Cron) to keep your recall sessions consistent.
 - **Quick Recall**: Choose from four plausible answers, then press `Enter` or click Submit for an immediate explanation.
-- **Balanced Catalogs**: Advanced Python and System Design each draw from 88 senior-level topics across 11 categories, selecting a category before a topic.
+- **Balanced Catalogs**: Advanced Python, LangChain, and System Design each draw from 88 senior-level topics across 11 categories, selecting a category before a topic.
 - **Advanced Python On Demand**: Every Python question is generated from the catalog at request time, so no article library has to be maintained.
+- **LangChain Ecosystem**: Covers LCEL, `create_agent`, LangGraph orchestration, persistence, retrieval, and LangSmith evaluation.
 - **No Giveaway Answers**: Answer length is enforced, not just requested, so the correct option cannot be spotted by being the longest.
 - **VRAM Optimized**: Ollama questions unload the configured model after generation by default.
 
@@ -47,7 +48,7 @@ Open `.env` and adjust the variables:
 - `OPENAI_API_KEY`: Your OpenAI API key (required for OpenAI provider).
 - `OPENAI_MODEL_NAME`: The OpenAI model to use (defaults to `gpt-4.1-mini`).
 - `MODEL_NAME`: The Ollama model to use (defaults to `gemma2:2b`).
-- `DEFAULT_QUESTION_MODE`: Initial mode (`advanced-python`, `rest-api`, `fastapi`, or `system-design`).
+- `DEFAULT_QUESTION_MODE`: Initial mode (`advanced-python`, `rest-api`, `fastapi`, `langchain`, or `system-design`).
 - `ANSWER_BALANCE_ATTEMPTS`: Attempts allowed to stop the correct answer from being the longest option (defaults to `2`; `1` disables regeneration).
 
 Restrict the local settings file because it contains credentials:
@@ -71,7 +72,7 @@ uv run main.py
 | `Enter` | Submit Answer |
 | `Ctrl+N` | Next Question |
 | `Ctrl+T` | Toggle Provider |
-| `Ctrl+R` | Toggle Question Mode |
+| `Ctrl+R` | Choose Topic (popup picker; `Esc` cancels) |
 | `Ctrl+Q` | Quit Application |
 
 ## ⚙️ How it Works
@@ -80,8 +81,9 @@ uv run main.py
 2. **Interaction**: Use the arrow keys to highlight an answer, then press `Enter` or click Submit.
 3. **Evaluation**: The app checks the selected answer locally and immediately shows the correct answer and rationale.
 4. **Switch Providers**: Press `Ctrl+T` anytime to toggle between OpenAI and Ollama. The question's provider is shown below its answers.
+5. **Choose a Topic**: Press `Ctrl+R` for a popup listing every topic. Click one or arrow to it and press `Enter`, and the next question is generated in that topic straight away. `Esc` closes the popup without changing anything, and re-picking the current topic leaves the question on screen alone. The active topic is always named at the top of the main screen.
 
-Advanced Python and System Design questions use categorized catalogs. Each question independently selects one of 11 categories and then one of its 8 topics, keeping broad areas evenly represented without storing topic history. Question modes are entirely topic-driven, so nothing is read from disk beyond the shipped catalogs.
+Advanced Python, LangChain, and System Design questions use categorized catalogs. Each question independently selects one of 11 categories and then one of its 8 topics, keeping broad areas evenly represented without storing topic history. Question modes are entirely topic-driven, so nothing is read from disk beyond the shipped catalogs.
 
 ### Answer Length Parity
 

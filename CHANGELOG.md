@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-09-05
+
+### Added
+
+- Persistent topic header on the main screen naming the active topic while generating, answering, and after an error
+
+### Changed
+
+- Generation status line no longer repeats the topic now that the header names it
+
+## [0.1.12] - 2026-09-05
+
+### Added
+
+- Modal topic picker on `Ctrl+R`, selectable by mouse click or keyboard, marking the active topic and cancellable with `Esc`
+
+### Changed
+
+- `Ctrl+R` opens the picker instead of cycling to the next topic, and choosing a different topic generates a question in it immediately rather than waiting for `Ctrl+N`
+- Re-picking the active topic is a no-op, so the question already on screen is not discarded
+
+## [0.1.11] - 2026-09-05
+
+### Added
+
+- LangChain question mode covering the wider ecosystem, with 88 topics across 11 balanced categories: LCEL and runnables, models and prompts, tools and structured output, `create_agent`, LangGraph construction, persistence and durability, human-in-the-loop control flow, streaming, retrieval, RAG quality, and LangSmith operations
+
+### Changed
+
+- Balanced-catalog tests are parametrized over every categorized mode instead of repeating per catalog
+
 ## [0.1.10] - 2026-09-05
 
 ### Added

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from code_recall.config import PROJECT_ROOT, Settings
+from code_recall.config import Settings
 from code_recall.content import ContentRepository
 from code_recall.domain import ContentError, QuestionMode
 
@@ -80,22 +80,20 @@ def test_explicit_general_category_is_preserved(make_settings: Callable[..., Set
     assert source.title == "General: Architecture basics"
 
 
-def test_system_design_catalog_is_balanced(make_settings: Callable[..., Settings]) -> None:
-    topic_file = PROJECT_ROOT / "data/system_design_topics.json"
-    repository = ContentRepository(make_settings(SYSTEM_DESIGN_TOPICS_FILE=topic_file))
-
-    catalog = repository._topic_catalog(QuestionMode.SYSTEM_DESIGN)
-
-    assert len(catalog) == 11
-    assert all(len(topics) == 8 for topics in catalog.values())
-    assert sum(len(topics) for topics in catalog.values()) == 88
+CATEGORIZED_MODES = [
+    QuestionMode.ADVANCED_PYTHON,
+    QuestionMode.LANGCHAIN,
+    QuestionMode.SYSTEM_DESIGN,
+]
 
 
-def test_advanced_python_catalog_is_balanced(make_settings: Callable[..., Settings]) -> None:
-    topic_file = PROJECT_ROOT / "data/advanced_python_topics.json"
-    repository = ContentRepository(make_settings(ADVANCED_PYTHON_TOPICS_FILE=topic_file))
+@pytest.mark.parametrize("mode", CATEGORIZED_MODES)
+def test_categorized_catalogs_are_balanced(mode: QuestionMode) -> None:
+    """Equal-sized categories keep category-first selection evenly weighted across topics."""
+    with patch.dict(os.environ, {}, clear=True):
+        repository = ContentRepository(Settings(_env_file=None))  # type: ignore[call-arg]
 
-    catalog = repository._topic_catalog(QuestionMode.ADVANCED_PYTHON)
+    catalog = repository._topic_catalog(mode)
 
     assert len(catalog) == 11
     assert all(len(topics) == 8 for topics in catalog.values())

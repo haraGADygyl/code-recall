@@ -41,10 +41,11 @@ uv run main.py
 ### Application Flow
 
 1. StartupScreen prepares the selected provider and validates the selected source mode
-2. Random technical topic selected → LLM generates a question, four answers, and rationale; advanced-python and system-design topics are selected category-first from balanced catalogs
+2. Random technical topic selected → LLM generates a question, four answers, and rationale; advanced-python, langchain, and system-design topics are selected category-first from balanced catalogs
 3. If the correct answer stands out as the longest option, the question is regenerated with corrective feedback, falling back to the most balanced candidate rather than erroring
 4. User selects an answer and presses Enter or clicks Submit → app evaluates it locally and displays the rationale
-5. Ollama unloads the configured model after generation unless `OLLAMA_KEEP_ALIVE` overrides the default
+5. `Ctrl+R` opens a modal topic picker; choosing a different topic immediately generates a question in it, and `#topic-label` names the active topic on the main screen
+6. Ollama unloads the configured model after generation unless `OLLAMA_KEEP_ALIVE` overrides the default
 
 ### Key Bindings
 
@@ -53,7 +54,7 @@ uv run main.py
 - `Enter` - Submit Answer
 - `Ctrl+N` - Next Question
 - `Ctrl+T` - Toggle Provider
-- `Ctrl+R` - Toggle Question Mode
+- `Ctrl+R` - Open the topic picker (`Esc` cancels)
 
 ## Configuration
 
@@ -61,7 +62,7 @@ Environment variables in `.env` (see `.env.example`):
 - `MODEL_NAME` - Ollama model to use (default: `gemma2:2b`)
 - `OPENAI_API_KEY`, `OPENAI_MODEL_NAME` - OpenAI credentials and model
 - `DEFAULT_PROVIDER` - Initial provider (`openai` or `ollama`)
-- `DEFAULT_QUESTION_MODE` - Initial technical-topic mode (`advanced-python`, `rest-api`, `fastapi`, or `system-design`)
+- `DEFAULT_QUESTION_MODE` - Initial technical-topic mode (`advanced-python`, `rest-api`, `fastapi`, `langchain`, or `system-design`)
 - `ANSWER_BALANCE_ATTEMPTS` - Attempts allowed to stop the correct answer from being the longest option
 
 ## Changelog

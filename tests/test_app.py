@@ -4,9 +4,10 @@ from typing import cast
 from unittest.mock import patch
 
 import pytest
+from textual.pilot import Pilot
 from textual.widgets import Button, Label, OptionList
 
-from code_recall.app import CodeRecallApp, StartupScreen
+from code_recall.app import CodeRecallApp, ModePickerScreen, StartupScreen
 from code_recall.config import Settings
 from code_recall.domain import Provider, QuestionMode, QuestionSession
 from code_recall.questions import QuestionService
@@ -191,3 +192,138 @@ async def test_new_generation_cancels_in_flight_request(make_settings: Callable[
 
             assert service.first_cancelled
             assert app.active_session == make_session()
+
+
+async def open_picker(app: CodeRecallApp, pilot: Pilot[None]) -> ModePickerScreen:
+    """Dismiss the startup screen and open the topic picker."""
+    await pilot.pause()
+    app.pop_screen()
+    await pilot.pause()
+    await pilot.press("ctrl+r")
+    await pilot.pause()
+    assert isinstance(app.screen, ModePickerScreen)
+    return app.screen
+
+
+@pytest.mark.anyio
+async def test_picker_opens_on_the_current_topic(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings(DEFAULT_QUESTION_MODE="fastapi"))
+        async with app.run_test() as pilot:
+            picker = await open_picker(app, pilot)
+
+            options = picker.query_one("#mode-options", OptionList)
+            assert options.highlighted == list(QuestionMode).index(QuestionMode.FASTAPI)
+            assert str(options.options[options.highlighted].prompt).startswith(">")
+
+
+@pytest.mark.anyio
+async def test_selecting_a_topic_generates_a_question_in_it(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            picker = await open_picker(app, pilot)
+
+            options = picker.query_one("#mode-options", OptionList)
+            options.highlighted = list(QuestionMode).index(QuestionMode.LANGCHAIN)
+            await pilot.press("enter")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            assert app.current_question_mode is QuestionMode.LANGCHAIN
+            assert not isinstance(app.screen, ModePickerScreen)
+            assert app.active_session is not None
+            assert app.active_session.mode is QuestionMode.LANGCHAIN
+
+
+@pytest.mark.anyio
+async def test_clicking_a_topic_selects_it(make_settings: Callable[..., Settings]) -> None:
+    """The picker is meant to be usable with the mouse, not only the keyboard."""
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            await open_picker(app, pilot)
+            target = list(QuestionMode).index(QuestionMode.REST_API)
+
+            await pilot.click("#mode-options", offset=(4, 1 + target))
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            assert app.current_question_mode is QuestionMode.REST_API
+            assert app.active_session is not None
+            assert app.active_session.mode is QuestionMode.REST_API
+
+
+@pytest.mark.anyio
+async def test_escape_cancels_without_changing_topic(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            await open_picker(app, pilot)
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert not isinstance(app.screen, ModePickerScreen)
+            assert app.current_question_mode is QuestionMode.SYSTEM_DESIGN
+            assert app.active_session is None
+
+
+@pytest.mark.anyio
+async def test_reselecting_the_current_topic_does_not_regenerate(make_settings: Callable[..., Settings]) -> None:
+    """Re-picking the active topic should not throw away the question already on screen."""
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            await open_picker(app, pilot)
+
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert app.current_question_mode is QuestionMode.SYSTEM_DESIGN
+            assert app.active_session is None
+
+
+@pytest.mark.anyio
+async def test_picker_does_not_stack_on_itself(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            await open_picker(app, pilot)
+            depth = len(app.screen_stack)
+
+            await pilot.press("ctrl+r")
+            await pilot.pause()
+
+            assert len(app.screen_stack) == depth
+
+
+@pytest.mark.anyio
+async def test_topic_header_names_the_active_topic(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings(DEFAULT_QUESTION_MODE="fastapi"))
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app.pop_screen()
+            await pilot.pause()
+
+            app.load_new_session()
+            await pilot.pause()
+
+            assert str(app.query_one("#topic-label", Label).render()) == "Topic: FastAPI"
+
+
+@pytest.mark.anyio
+async def test_topic_header_follows_the_picker(make_settings: Callable[..., Settings]) -> None:
+    with patch.object(StartupScreen, "run_startup_checks"):
+        app = make_app(make_settings())
+        async with app.run_test() as pilot:
+            picker = await open_picker(app, pilot)
+
+            options = picker.query_one("#mode-options", OptionList)
+            options.highlighted = list(QuestionMode).index(QuestionMode.LANGCHAIN)
+            await pilot.press("enter")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            assert str(app.query_one("#topic-label", Label).render()) == "Topic: LangChain"

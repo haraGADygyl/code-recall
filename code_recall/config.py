@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     ADVANCED_PYTHON_TOPICS_FILE: Path = PROJECT_ROOT / "data/advanced_python_topics.json"
     REST_API_TOPICS_FILE: Path = PROJECT_ROOT / "data/rest_api_topics.json"
     FASTAPI_TOPICS_FILE: Path = PROJECT_ROOT / "data/fastapi_topics.json"
+    LANGCHAIN_TOPICS_FILE: Path = PROJECT_ROOT / "data/langchain_topics.json"
     SYSTEM_DESIGN_TOPICS_FILE: Path = PROJECT_ROOT / "data/system_design_topics.json"
 
     ANSWER_BALANCE_ATTEMPTS: int = Field(default=2, ge=1, le=4)
@@ -57,6 +58,7 @@ class Settings(BaseSettings):
             "ADVANCED_PYTHON_TOPICS_FILE",
             "REST_API_TOPICS_FILE",
             "FASTAPI_TOPICS_FILE",
+            "LANGCHAIN_TOPICS_FILE",
             "SYSTEM_DESIGN_TOPICS_FILE",
         ):
             path = getattr(self, field_name).expanduser()
